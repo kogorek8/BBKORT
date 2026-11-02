@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BBKORT – King of the Court</title>
+  <meta name="description" content="BBKORT – mapa boisk do koszykówki, drużyny i walka o tytuł King of the Court.">
+  <meta name="theme-color" content="#0d0f14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/icon.svg">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/map">BB<span>KORT</span></a>
+    <div class="top-actions">
+      <button id="lang-btn" class="btn small ghost">EN</button>
+      <span id="user-chip"></span>
+    </div>
+  </header>
+  <div id="demo-bar" hidden></div>
+
+  <main>
+    <section id="map-view">
+      <div id="map"></div>
+      <div id="map-controls" class="map-controls"></div>
+      <div id="court-sheet" class="sheet" hidden></div>
+    </section>
+    <section id="page" hidden><div class="loading">🏀</div></section>
+  </main>
+
+  <nav class="bottom-nav" id="nav"></nav>
+  <div id="toast"></div>
+  <div id="modal-root"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

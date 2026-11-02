@@ -1,0 +1,103 @@
+import { initApi, api } from './api/index.js';
+import { t, getLang, setLang } from './i18n.js';
+import { store, onRender, reload, softReload, myTeam, errText } from './state.js';
+import { startGeo } from './geo.js';
+import { esc, teamTag } from './ui.js';
+import { initMap, refreshMap, showMap, focusCourt } from './views/map.js';
+import { renderTeams, renderTeam } from './views/teams.js';
+import { renderPlayer } from './views/player.js';
+import { renderMatches, pendingActionsCount } from './views/matches.js';
+import { renderAdmin } from './views/admin.js';
+import { renderAuth } from './views/auth.js';
+
+const $ = (id) => document.getElementById(id);
+let lastFocus = null;
+
+function route() {
+  const [name, param] = (location.hash.replace(/^#\/?/, '') || 'map').split('/');
+  return { name: name || 'map', param };
+}
+
+function renderChrome() {
+  document.documentElement.lang = getLang();
+  $('lang-btn').textContent = getLang() === 'pl' ? 'EN' : 'PL';
+  const me = store.me;
+  const tm = myTeam();
+  $('user-chip').innerHTML = me
+    ? `<a href="#/player/me">${tm ? teamTag(tm) + ' ' : ''}${esc(me.nick)}</a>`
+    : `<a href="#/login" class="btn small primary">${t('login')}</a>`;
+
+  const demo = $('demo-bar');
+  if (api.mode === 'demo') {
+    demo.hidden = false;
+    demo.innerHTML = `🧪 ${t('demo_bar')} <b>${esc(me?.nick || '—')}</b> · <a href="#/login">${t('switch_user')}</a>`;
+  }
+
+  const r = route().name;
+  const badge = pendingActionsCount();
+  const items = [
+    ['map', '🗺️', t('nav_map')],
+    ['teams', '🛡️', t('nav_teams')],
+    ['matches', '⚔️', t('nav_matches'), badge],
+    ['player', '👤', t('nav_profile'), 0, 'player/me'],
+    ...(me?.is_admin ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => c.status === 'disputed').length]] : []),
+  ];
+  $('nav').innerHTML = items.map(([key, ic, label, n, href]) => {
+    const on = r === key || (key === 'teams' && r === 'team');
+    return `<a href="#/${href || key}" class="${on ? 'on' : ''}"><span class="ic">${ic}${n ? `<i class="dot">${n}</i>` : ''}</span><span>${label}</span></a>`;
+  }).join('');
+}
+
+function render() {
+  if (!store.data) return;
+  renderChrome();
+  const r = route();
+  const page = $('page');
+  if (r.name === 'map') {
+    $('map-view').hidden = false;
+    page.hidden = true;
+    showMap();
+    refreshMap();
+    if (r.param && r.param !== lastFocus) { lastFocus = r.param; setTimeout(() => focusCourt(r.param), 80); }
+    return;
+  }
+  lastFocus = null;
+  $('map-view').hidden = true;
+  page.hidden = false;
+  switch (r.name) {
+    case 'teams': return renderTeams(page);
+    case 'team': return renderTeam(page, r.param);
+    case 'player': return renderPlayer(page, r.param || 'me');
+    case 'matches': return renderMatches(page);
+    case 'admin': return renderAdmin(page);
+    case 'login': return renderAuth(page);
+    default: location.hash = '#/map';
+  }
+}
+
+async function boot() {
+  $('lang-btn').onclick = () => { setLang(getLang() === 'pl' ? 'en' : 'pl'); render(); };
+  try {
+    await initApi();
+    onRender(render);
+    await reload();
+  } catch (e) {
+    $('page').hidden = false;
+    $('page').innerHTML = `<div class="auth"><h2>⚠️ ${t('err_generic')}</h2><p class="muted">${esc(errText(e))}</p></div>`;
+    console.error(e);
+    return;
+  }
+  initMap();
+  refreshMap();
+  startGeo();
+  api.onChange(softReload);
+  window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+  // odświeżanie liczników co minutę (gdy nikt nie pisze w formularzu)
+  setInterval(() => {
+    const busy = document.querySelector('.modal-back') || ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+    if (!busy) softReload();
+  }, 60000);
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+boot();
