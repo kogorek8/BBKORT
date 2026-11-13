@@ -128,7 +128,6 @@ export const CITY_PRESETS = {
   'Lublin': [51.17, 22.45, 51.30, 22.68],
   'Katowice i okolice': [50.15, 18.85, 50.40, 19.25],
   'Białystok': [53.08, 23.05, 53.18, 23.25],
-  'Rzeszów': [49.97, 21.90, 50.10, 22.08],
   'Olsztyn': [53.72, 20.40, 53.82, 20.56],
   'Kielce': [50.83, 20.55, 50.92, 20.72],
   'Opole': [50.62, 17.85, 50.72, 18.02],
@@ -144,6 +143,56 @@ export function tiles([s, w, n, e], dLat = 0.09, dLng = 0.14) {
   const out = [];
   for (let a = s; a < n; a += dLat) for (let b = w; b < e; b += dLng) {
     out.push({ s: a, w: b, n: Math.min(a + dLat, n), e: Math.min(b + dLng, e) });
+  }
+  return out;
+}
+
+// ---------- IMPORT Z PLIKU / WKLEJONEGO TEKSTU ----------
+// Obsługuje: KML (Google Moje Mapy), GeoJSON (Google Takeout "Zapisane"), CSV (nazwa;lat;lng)
+// oraz zwykłe linie z linkami Google Maps albo współrzędnymi.
+const okLL = (lat, lng) => isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+
+function llFromText(str) {
+  let m = str.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)            // link Google: ...!3dLAT!4dLNG
+    || str.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)                     // link Google: @LAT,LNG
+    || str.match(/[?&](?:q|ll|query|destination)=(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)/i)
+    || str.match(/(-?\d{1,2}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)/);        // "50.0412, 21.9991"
+  return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+}
+
+export function parseCourts(text, sport) {
+  const out = [];
+  const add = (name, lat, lng, address = '') => {
+    if (!okLL(lat, lng)) return;
+    out.push({ external_id: `file:${sport}:${lat.toFixed(5)},${lng.toFixed(5)}`, name: (name || '').trim().slice(0, 80), sport, lat, lng, address: (address || '').slice(0, 120), source: 'import' });
+  };
+  const t = text.trim();
+  if (/^<\?xml|<kml/i.test(t)) {                                        // KML
+    const doc = new DOMParser().parseFromString(t, 'text/xml');
+    doc.querySelectorAll('Placemark').forEach((pm) => {
+      const c = pm.querySelector('Point coordinates');
+      if (!c) return;
+      const [lng, lat] = c.textContent.trim().split(',').map(Number);
+      add(pm.querySelector('name')?.textContent, lat, lng, pm.querySelector('address')?.textContent || '');
+    });
+  } else if (t[0] === '{' || t[0] === '[') {                             // GeoJSON
+    const j = JSON.parse(t);
+    for (const f of (j.features || (Array.isArray(j) ? j : []))) {
+      const g = f.geometry, pr = f.properties || {};
+      if (!g || g.type !== 'Point') continue;
+      const loc = pr.location || pr.Location || {};
+      add(pr.name || pr.Title || pr.title || loc.name || loc['Business Name'], Number(g.coordinates[1]), Number(g.coordinates[0]), loc.address || loc.Address || pr.address || '');
+    }
+  } else {                                                               // CSV / linie tekstu
+    for (const line of t.split(/\r?\n/)) {
+      const ll = llFromText(line);
+      if (!ll) continue;
+      const name = line.split(/[;\t]|,(?=\s*(?:https?:|-?\d))/)[0].replace(/https?:\S+/g, '').replace(/^"|"$/g, '').trim();
+      const place = line.match(/\/maps\/place\/([^/@]+)/);            // nazwa z linku Google Maps
+      let nm = /^-?\d/.test(name) ? '' : name;
+      if (!nm && place) { try { nm = decodeURIComponent(place[1].replace(/\+/g, ' ')); } catch { nm = ''; } }
+      add(nm, ll[0], ll[1]);
+    }
   }
   return out;
 }

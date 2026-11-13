@@ -794,6 +794,12 @@ const pl = {
   faq5_a: "Paski skilli ustawia admin lub sędzia BBKORT na podstawie meczów i nagrań. Możesz zaproponować swoje wartości i dodać filmik.",
   step_checkin: "Zamelduj się na boisku",
   step_court: "Zgłoś przejęcie boiska albo wyzwanie",
+  file_import: "Import z pliku lub listy",
+  file_import_hint: "Wgraj plik z Google Moje Mapy (KML), Google Takeout „Zapisane” (GeoJSON) albo CSV. Możesz też wkleić linki z Google Maps lub współrzędne – jedna pozycja w linii, np. „Boisko przy SP 5; 50.0412, 21.9991”.",
+  file_import_ph: "Nazwa boiska; 50.0412, 21.9991\nhttps://www.google.com/maps/place/…/@50.04,21.99,17z",
+  file_import_go: "Importuj",
+  file_import_bad: "Nie udało się odczytać pliku",
+  file_import_none: "Nie znaleziono żadnych współrzędnych",
 };
 
 const en = {
@@ -1585,6 +1591,12 @@ const en = {
   faq5_a: "Skill bars are set by the BBKORT admin or referee based on matches and videos. You can propose your own values and add a video.",
   step_checkin: "Check in at a court",
   step_court: "Request a court claim or a challenge",
+  file_import: "Import from a file or list",
+  file_import_hint: "Upload a Google My Maps file (KML), Google Takeout “Saved” (GeoJSON) or CSV. You can also paste Google Maps links or coordinates – one per line, e.g. “Court by School 5; 50.0412, 21.9991”.",
+  file_import_ph: "Court name; 50.0412, 21.9991\nhttps://www.google.com/maps/place/…/@50.04,21.99,17z",
+  file_import_go: "Import",
+  file_import_bad: "Could not read the file",
+  file_import_none: "No coordinates found",
 };
 
 const DICT = { pl, en };

@@ -1,0 +1,12 @@
+{
+  "name": "bbkort",
+  "private": true,
+  "type": "module",
+  "description": "BBKORT – aplikacja webowa. Kod źródłowy: app/js. Wynik budowania: app/app.js (jeden plik).",
+  "scripts": {
+    "build": "bash scripts/build.sh"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0"
+  }
+}

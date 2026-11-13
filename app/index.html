@@ -13,9 +13,9 @@
   <link rel="apple-touch-icon" href="img/icon.svg">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20261113-0313">
 </head>
-<body>
+<body data-version="20261113-0313">
   <header class="topbar">
     <a class="brand" href="#/home">BB<span>KORT</span></a>
     <div class="top-actions">
@@ -41,6 +41,26 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script type="module" src="js/main.js"></script>
+  <script>
+    // Gdy aplikacja się nie uruchomi (stara wersja w pamięci, brak sieci) – pokaż komunikat zamiast wiecznego logo
+    window.__bbBooted = false;
+    function bbFail(msg) {
+      var p = document.getElementById('page');
+      if (window.__bbBooted || !p || p.dataset.failed) return;
+      p.dataset.failed = '1'; p.hidden = false;
+      p.innerHTML = '<div class="loading"><div class="brand big">BB<span>KORT</span></div>'
+        + '<p><b>Nie udało się załadować aplikacji.</b></p><p class="muted small">' + String(msg).replace(/</g, '&lt;') + '</p>'
+        + '<button class="btn primary big" onclick="bbReload()">Odśwież</button>'
+        + '<p class="muted small">wersja ' + document.body.dataset.version + '</p></div>';
+    }
+    function bbReload() { var u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); }
+    window.addEventListener('error', function (e) {
+      var t = e.target; if (t && t.tagName === 'IMG') return;
+      bbFail(e.message || ('Nie wczytano pliku: ' + ((t && (t.src || t.href)) || '?')));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) { bbFail((e.reason && e.reason.message) || e.reason); });
+    setTimeout(function () { bbFail('Aplikacja ładuje się zbyt długo – słabe połączenie albo stara wersja w pamięci przeglądarki.'); }, 20000);
+  </script>
+  <script type="module" src="app.js?v=20261113-0313"></script>
 </body>
 </html>

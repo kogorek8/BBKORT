@@ -5,7 +5,8 @@ import { H } from '../rules.js';
 import { ovr, tier, skillsOf } from '../skills.js';
 import { esc, bind, teamTag, fmtDate, fmtLeft, confirmBox } from '../ui.js';
 import { store, act, reload, teamById, isAdmin, isStaff, teamChallenges, now, T, openIssues } from '../state.js';
-import { CITY_PRESETS, tiles, fetchArea } from '../courts-import.js';
+import { CITY_PRESETS, tiles, fetchArea, parseCourts } from '../courts-import.js';
+import { SPORTS } from '../rules.js';
 import { getMapBounds } from './map.js';
 import { SPORT_ICON } from '../rules.js';
 import { toast } from '../ui.js';
@@ -143,6 +144,15 @@ function courtsTab() {
         <button class="btn" data-act="import-view" ${importing ? 'disabled' : ''}>🗺️ ${t('import_view')}</button></div>
       <div id="imp-status" class="small"></div>
     </div>
+    <div class="review">
+      <b>📂 ${t('file_import')}</b>
+      <p class="small muted">${t('file_import_hint')}</p>
+      <select id="fi-sport">${SPORTS.map((sp) => `<option value="${sp}">${SPORT_ICON[sp]} ${t('sport_' + sp)}</option>`).join('')}</select>
+      <input type="file" id="fi-file" accept=".kml,.json,.geojson,.csv,.txt">
+      <textarea id="fi-text" rows="3" placeholder="${t('file_import_ph')}"></textarea>
+      <button class="btn primary" data-act="import-file">⬆️ ${t('file_import_go')}</button>
+      <div id="fi-status" class="small"></div>
+    </div>
     <h3>📥 ${t('pending_courts')} (${store.data.pending_courts.length})</h3>
     ${store.data.pending_courts.map((c) => `<div class="review"><b>${SPORT_ICON[c.sport]} ${esc(c.name)}</b>
       <div class="small muted">${esc(c.address || '')} · ${esc(store.data.profiles.find((p) => p.id === c.added_by)?.nick || '?')} ·
@@ -234,6 +244,22 @@ export function renderAdmin(root) {
     'court-no': (d) => act('review_court', { p_court: d.id, p_approve: false }, 'ok_saved'),
     'issue-ok': (d) => act('resolve_issue', { p_id: Number(d.id) || d.id }, 'ok_saved'),
     shift: (d) => api.demo.shiftTime(Number(d.h) * H),
+    'import-file': async () => {
+      const f = root.querySelector('#fi-file').files[0];
+      const text = f ? await f.text() : root.querySelector('#fi-text').value;
+      const st = root.querySelector('#fi-status');
+      let list = [];
+      try { list = parseCourts(text || '', root.querySelector('#fi-sport').value); } catch (e) { return toast(t('file_import_bad'), 'err'); }
+      if (!list.length) return toast(t('file_import_none'), 'err');
+      let added = 0;
+      for (let j = 0; j < list.length; j += 250) {
+        st.textContent = `${Math.min(j + 250, list.length)}/${list.length}…`;
+        const r = await act('import_courts', { p_courts: list.slice(j, j + 250) });
+        if (r == null) return;
+        added += Number(r) || 0;
+      }
+      toast(t('import_done', { a: added, f: list.length }), 'ok');
+    },
     'import-city': () => { const c = root.querySelector('#city').value; runImport(root, CITY_PRESETS[c], c); },
     'import-view': () => {
       const b = getMapBounds();

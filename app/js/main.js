@@ -58,6 +58,7 @@ function renderChrome() {
 
 function render() {
   if (!store.data) return;
+  window.__bbBooted = true;
   renderChrome();
   const r = route();
   const page = $('page');
@@ -98,8 +99,9 @@ async function boot() {
     onRender(render);
     await reload();
   } catch (e) {
+    window.__bbBooted = true;
     $('page').hidden = false;
-    $('page').innerHTML = `<div class="auth"><h2>⚠️ ${t('err_generic')}</h2><p class="muted">${esc(errText(e))}</p></div>`;
+    $('page').innerHTML = `<div class="auth"><h2>⚠️ ${t('err_generic')}</h2><p class="muted">${esc(errText(e))}</p><button class="btn primary" onclick="bbReload()">Odśwież</button></div>`;
     console.error(e);
     return;
   }
@@ -115,5 +117,7 @@ async function boot() {
   }, 60000);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 }
+
+export const VERSION = typeof __BB_VERSION__ !== 'undefined' ? __BB_VERSION__ : 'dev';
 
 boot();

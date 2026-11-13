@@ -147,7 +147,8 @@ function dashboard(root) {
       <a class="tile" href="#/teams"><span>🛡️</span>${t('nav_teams')}</a>
       <a class="tile" href="#/inbox"><span>🔔</span>${t('inbox_title')}${unreadCount() ? ` (${unreadCount()})` : ''}</a>
       <a class="tile" href="#/how"><span>❓</span>${t('how_title')}</a>
-    </div>`;
+    </div>
+    <p class="small muted center">BBKORT · ${esc(document.body.dataset.version || '')}</p>`;
   bind(root, {
     ...challengeHandlers, ...gameHandlers, drop: claimDrop(root),
     'inv-yes': (d) => act('respond_team_request', { p_team: d.id, p_player: p.id, p_accept: true }, 'ok_joined'),
