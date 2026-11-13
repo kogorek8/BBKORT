@@ -1,8 +1,4 @@
--- BBKORT – CZĘŚĆ 3 z 5. Uruchamiaj po kolei: 1, 2, 3, 4, 5.
--- (Ten sam kod co schema.sql, tylko podzielony na krótsze kawałki – łatwiej skopiować na iPadzie.)
-
--- ---------- RPC: DRUŻYNY ----------------------------------------------
-
+select 'BBKORT czesc 3 z 5';
 create or replace function public.create_team(p_name text, p_tag text, p_color text, p_sport text)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare me public.profiles; nid uuid;
@@ -20,7 +16,6 @@ begin
   update public.profiles set team_id = nid, sport = p_sport where id = me.id;
   return nid;
 end $$;
-
 create or replace function public.join_team(p_team uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; tm public.teams;
@@ -31,7 +26,6 @@ begin
   if tm.id is null then raise exception 'err_not_found'; end if;
   update public.profiles set team_id = p_team, sport = tm.sport where id = me.id;
 end $$;
-
 create or replace function public.leave_team()
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; nxt uuid;
@@ -42,13 +36,12 @@ begin
   if public.bb_is_captain(me.id, me.team_id) then
     select id into nxt from public.profiles where team_id = me.team_id order by created_at limit 1;
     if nxt is null then
-      delete from public.teams where id = me.team_id;   -- boiska stają się wolne
+      delete from public.teams where id = me.team_id;
     else
       update public.teams set captain_id = nxt where id = me.team_id;
     end if;
   end if;
 end $$;
-
 create or replace function public.kick_member(p_player uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles;
@@ -58,11 +51,6 @@ begin
   if p_player = me.id then raise exception 'err_bad_request'; end if;
   update public.profiles set team_id = null where id = p_player and team_id = me.team_id;
 end $$;
-
--- ---------- RPC: BOISKA -----------------------------------------------
-
--- Dodaje boiska znalezione automatycznie (OpenStreetMap / Google).
--- Pomija duplikaty: ten sam external_id albo boisko tego samego sportu w promieniu ~40 m.
 create or replace function public.import_courts(p_courts jsonb)
 returns int language plpgsql security definer set search_path = public as $$
 declare r jsonb; n int := 0; la float8; ln float8; sp text;
@@ -85,8 +73,6 @@ begin
   end loop;
   return n;
 end $$;
-
--- Przejęcie WOLNEGO boiska (trzeba fizycznie być na miejscu)
 create or replace function public.claim_court(p_court uuid, p_lat float8, p_lng float8)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; ct public.courts; tm public.teams;
@@ -105,4 +91,3 @@ begin
    where id = p_court;
   insert into public.court_history (court_id, team_id, event) values (p_court, me.team_id, 'claim');
 end $$;
-

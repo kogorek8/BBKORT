@@ -1,8 +1,4 @@
--- BBKORT – CZĘŚĆ 4 z 5. Uruchamiaj po kolei: 1, 2, 3, 4, 5.
--- (Ten sam kod co schema.sql, tylko podzielony na krótsze kawałki – łatwiej skopiować na iPadzie.)
-
--- ---------- RPC: WYZWANIA ---------------------------------------------
-
+select 'BBKORT czesc 4 z 5';
 create or replace function public.create_challenge(p_court uuid, p_time timestamptz)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare me public.profiles; ct public.courts; tm public.teams; nid uuid;
@@ -30,7 +26,6 @@ begin
   insert into public.challenge_players (challenge_id, player_id, team_id) values (nid, me.id, me.team_id);
   return nid;
 end $$;
-
 create or replace function public.cancel_challenge(p_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges;
@@ -42,7 +37,6 @@ begin
   if not public.bb_is_captain(me.id, c.challenger_team_id) then raise exception 'err_not_captain'; end if;
   update public.challenges set status = 'cancelled', resolved_at = now() where id = p_id;
 end $$;
-
 create or replace function public.accept_challenge(p_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges;
@@ -56,8 +50,6 @@ begin
   insert into public.challenge_players (challenge_id, player_id, team_id)
   values (p_id, me.id, c.defender_team_id) on conflict do nothing;
 end $$;
-
--- "Król" oddaje boisko bez gry
 create or replace function public.forfeit_challenge(p_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges;
@@ -67,10 +59,9 @@ begin
   if c.id is null then raise exception 'err_not_found'; end if;
   if c.status not in ('pending','accepted') then raise exception 'err_bad_state'; end if;
   if not public.bb_is_captain(me.id, c.defender_team_id) then raise exception 'err_not_captain'; end if;
-  update public.challenges set status = 'pending' where id = p_id;   -- bez duchów przy poddaniu
+  update public.challenges set status = 'pending' where id = p_id;
   perform public.bb_finalize(p_id, c.challenger_team_id, 'walkover', 'forfeit', me.id);
 end $$;
-
 create or replace function public.join_match(p_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges;
@@ -85,7 +76,6 @@ begin
   insert into public.challenge_players (challenge_id, player_id, team_id)
   values (p_id, me.id, me.team_id) on conflict do nothing;
 end $$;
-
 create or replace function public.leave_match(p_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges;
@@ -97,7 +87,6 @@ begin
   delete from public.challenge_players
    where challenge_id = p_id and player_id = me.id and checked_in_at is null;
 end $$;
-
 create or replace function public.check_in(p_id uuid, p_lat float8, p_lng float8)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges; ct public.courts;
@@ -117,8 +106,6 @@ begin
   values (p_id, me.id, me.team_id, now())
   on conflict (challenge_id, player_id) do update set checked_in_at = coalesce(public.challenge_players.checked_in_at, now());
 end $$;
-
--- Sędzia (moderator/admin) bierze mecz – będzie na miejscu albo obejrzy nagranie
 create or replace function public.take_referee(p_id uuid, p_take boolean)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges;
@@ -133,8 +120,6 @@ begin
     update public.challenges set referee_id = null where id = p_id and referee_id = me.id;
   end if;
 end $$;
-
--- Kapitan zgłasza wynik (albo walkower) – ZAWSZE do zatwierdzenia przez sędziego/admina
 create or replace function public.report_result(p_id uuid, p_score_challenger int, p_score_defender int, p_video text, p_walkover boolean)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges; rep jsonb; mine uuid; other uuid; a int; b int;
@@ -147,9 +132,7 @@ begin
   elsif public.bb_is_captain(me.id, c.defender_team_id) then mine := c.defender_team_id; other := c.challenger_team_id;
   else raise exception 'err_not_captain'; end if;
   if now() < c.scheduled_at - interval '30 minutes' then raise exception 'err_too_early'; end if;
-
   if coalesce(p_walkover, false) then
-    -- walkower: 30 min po starcie, my na miejscu, rywala brak
     if now() < c.scheduled_at + interval '30 minutes' then raise exception 'err_too_early'; end if;
     select count(*) filter (where team_id = mine  and checked_in_at is not null),
            count(*) filter (where team_id = other and checked_in_at is not null)
@@ -166,16 +149,12 @@ begin
     rep := jsonb_build_object('a', p_score_challenger, 'b', p_score_defender, 'walkover', false,
                               'video', nullif(trim(coalesce(p_video,'')),''), 'at', now());
   end if;
-
   if mine = c.challenger_team_id then
     update public.challenges set challenger_report = rep, status = 'reported' where id = p_id;
   else
     update public.challenges set defender_report = rep, status = 'reported' where id = p_id;
   end if;
 end $$;
-
--- Sędzia / admin zatwierdza wynik ostateczny.
---  p_winner = null → mecz unieważniony; wynik bez punktów → walkower.
 create or replace function public.referee_result(p_id uuid, p_winner uuid, p_score_challenger int, p_score_defender int, p_video text, p_note text)
 returns void language plpgsql security definer set search_path = public as $$
 declare me public.profiles; c public.challenges; st text;
@@ -205,21 +184,16 @@ begin
    where id = p_id;
   perform public.bb_finalize(p_id, p_winner, st, coalesce(nullif(p_note,''), case when st = 'walkover' then 'no_show' end), me.id);
 end $$;
-
--- Rozlicza przeterminowane wyzwania (wywoływane przez aplikację; opcjonalnie pg_cron)
 create or replace function public.resolve_expired()
 returns int language plpgsql security definer set search_path = public as $$
 declare c record; n int := 0;
 begin
-  -- 1) "Król" nie odpowiedział w 48 h → walkower dla wyzywających + duch dla kapitana
   for c in select * from public.challenges where status = 'pending' and accept_deadline < now() loop
     update public.profiles set ghost_count = ghost_count + 1
      where id = (select captain_id from public.teams where id = c.defender_team_id);
     perform public.bb_finalize(c.id, c.challenger_team_id, 'walkover', 'no_response', null);
     n := n + 1;
   end loop;
-  -- 2) Mecz bez żadnego zgłoszenia wyniku 48 h po starcie → wygasa
-  --    (zgłoszone wyniki 'reported' czekają na sędziego – nie wygasają same)
   for c in select * from public.challenges
             where status = 'accepted' and scheduled_at + interval '48 hours' < now() loop
     perform public.bb_finalize(c.id, null, 'expired', 'no_report', null);
@@ -227,4 +201,3 @@ begin
   end loop;
   return n;
 end $$;
-
