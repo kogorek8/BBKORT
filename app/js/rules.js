@@ -33,6 +33,22 @@ export function distM(lat1, lng1, lat2, lng2) {
   return 2 * 6371000 * Math.asin(Math.sqrt(a));
 }
 
-// OCENA BOISKA – kryteria (gwiazdki 1–5). Tymczasowe – podmień na reguły z planu BBKORT.
-// Klucz = nazwa w bazie, tekst = i18n "cr_<klucz>". Można dodawać/usuwać bez zmian w bazie.
-export const COURT_CRITERIA = ['surface', 'hoops', 'lighting', 'access', 'vibe'];
+// OPINIA ZAWODNIKÓW o boisku (gwiazdki 1–5) – zgodnie z planem: komfort, chęć powrotu, klimat
+export const COURT_CRITERIA = ['comfort', 'return', 'vibe'];
+
+// OFICJALNA KARTA BOISKA "OG SPOT" – 100 pkt w 8 obszarach (z biznesplanu)
+export const REVIEW_AREAS = [
+  { key: 'surface', max: 25 },      // równość, przyczepność i stan 15 + równomierność odbicia 10
+  { key: 'hoop', max: 20 },         // oględziny, wysokość, obręcz, tablica, mocowania, siatka
+  { key: 'space', max: 15 },        // wymiary pola, przeszkody, miejsce do wybiegania
+  { key: 'lines', max: 10 },        // granice, linia wolnych, łuk, czytelność
+  { key: 'access', max: 10 },       // godziny, opłaty, zasady wejścia
+  { key: 'surroundings', max: 5 },  // ławki, odpady, miejsce na rzeczy, cień
+  { key: 'regular', max: 5 },       // utrzymanie, współdzielenie, kontakt do zarządcy
+  { key: 'players', max: 10 },      // średnia ocen zawodników: komfort, chęć powrotu, klimat
+];
+// Znak OG SPOT: min. 75/100, brak zagrożeń oraz min. 3/5 (60%) osobno za nawierzchnię, kosz i przestrzeń
+export const OG_MIN_TOTAL = 75;
+export const OG_MIN = { surface: 15, hoop: 12, space: 9 };
+export const SUGGESTION_KINDS = ['urgent', 'cheap', 'invest'];
+export const GAME_LEVELS = ['all', 'beginner', 'mid', 'pro'];

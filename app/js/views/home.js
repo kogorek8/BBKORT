@@ -4,8 +4,10 @@ import { SPORTS, SPORT_ICON, OPEN_STATUSES, WIN_STATUSES } from '../rules.js';
 import { playerOvr, tier, teamRating, skillsOf } from '../skills.js';
 import { esc, bind, teamTag } from '../ui.js';
 import {
-  store, myTeam, members, standings, isStaff, courtsOf, teamChallenges,
+  store, act, myTeam, members, standings, isStaff, courtsOf, teamChallenges, teamById, myTeamRequests, myGames, upcomingGames, courtById, courtName, reviewValid,
 } from '../state.js';
+import { gameCard, gameHandlers } from './games.js';
+import { ogBadge } from './spots.js';
 import { actionsFor, challengeCard, challengeHandlers } from './matches.js';
 
 function myStats(p) {
@@ -37,6 +39,9 @@ function dashboard(root) {
     { done: !!(tm && (courtsOf(tm.id).length || teamChallenges(tm.id).length)), label: t('step_court'), href: '#/map' },
   ];
   const stepsDone = steps.filter((s) => s.done).length;
+  const invites = myTeamRequests().filter((r) => r.kind === 'invite');
+  const mine = myGames();
+  const open = upcomingGames().filter((g) => !mine.includes(g));
   const pendingRes = store.data.challenges.filter((c) => c.status === 'reported').length;
   const pendingSk = store.data.profiles.filter((x) => x.skills_status === 'pending').length;
 
@@ -68,6 +73,13 @@ function dashboard(root) {
       <div class="matches">${urgent.slice(0, 2).map((c) => challengeCard(c)).join('')}</div>
       ${urgent.length > 2 ? `<a class="btn ghost block" href="#/matches">${t('see_all')}</a>` : ''}` : ''}
 
+    ${invites.length ? `<h3>📩 ${t('team_invites')}</h3>${invites.map((r) => { const x = teamById(r.team_id); return x ? `<div class="notice row-between"><span>${teamTag(x)} <b>${esc(x.name)}</b> ${t('invites_you')}</span>
+      <span><button class="btn small primary" data-act="inv-yes" data-id="${esc(x.id)}">${t('accept_invite')}</button> <button class="btn small ghost" data-act="inv-no" data-id="${esc(x.id)}">✕</button></span></div>` : ''; }).join('')}` : ''}
+
+    <h3>🤝 ${mine.length ? t('g_mine') : t('g_open')}</h3>
+    <div class="matches">${(mine.length ? mine : open).slice(0, 2).map((g) => gameCard(g)).join('') || `<p class="muted small">${t('g_none')}</p>`}</div>
+    <a class="btn ghost block" href="#/games">${t('g_see_all')} ›</a>
+
     ${isStaff() && (pendingRes || pendingSk) ? `<a class="notice staff" href="#/admin">🧑‍⚖️ ${t('staff_todo', { r: pendingRes, s: pendingSk })} ›</a>` : ''}
 
     <h3>🛡️ ${t('my_team')}</h3>
@@ -93,23 +105,27 @@ function dashboard(root) {
         <span class="step-n">${s.done ? '✓' : i + 1}</span><span>${s.label}</span><span class="chev">›</span></a>`).join('')}</div>` : ''}
 
     <div class="tiles">
-      <a class="tile" href="#/map"><span>🗺️</span>${t('nav_map')}</a>
+      <a class="tile" href="#/spots"><span>★</span>OG SPOT</a>
+      <a class="tile" href="#/teams"><span>🛡️</span>${t('nav_teams')}</a>
       <a class="tile" href="#/matches"><span>⚔️</span>${t('nav_matches')}</a>
-      <a class="tile" href="#/table"><span>📊</span>${t('nav_table')}</a>
       <a class="tile" href="#/how"><span>❓</span>${t('how_title')}</a>
     </div>`;
-  bind(root, challengeHandlers);
+  bind(root, {
+    ...challengeHandlers, ...gameHandlers,
+    'inv-yes': (d) => act('respond_team_request', { p_team: d.id, p_player: p.id, p_accept: true }, 'ok_joined'),
+    'inv-no': (d) => act('respond_team_request', { p_team: d.id, p_player: p.id, p_accept: false }, 'ok_saved'),
+  });
 }
 
 // ---------- JAK TO DZIAŁA (wspólne) ----------
 export function howItWorks() {
   const steps = [
     ['🗺️', t('how1_t'), t('how1_d')],
-    ['🛡️', t('how2_t'), t('how2_d')],
-    ['👑', t('how3_t'), t('how3_d')],
+    ['🤝', t('how2_t'), t('how2_d')],
+    ['🛡️', t('how3_t'), t('how3_d')],
     ['⚔️', t('how4_t'), t('how4_d')],
-    ['🧑‍⚖️', t('how5_t'), t('how5_d')],
-    ['🚩', t('how6_t'), t('how6_d')],
+    ['✅', t('how5_t'), t('how5_d')],
+    ['📊', t('how6_t'), t('how6_d')],
   ];
   return `<div class="how">${steps.map(([ic, title, d], i) => `<div class="how-step">
     <div class="how-ic">${ic}<i>${i + 1}</i></div><div><b>${title}</b><p>${d}</p></div></div>`).join('')}</div>`;
@@ -128,7 +144,8 @@ export function renderHow(root) {
 // ---------- GOŚĆ ----------
 function landing(root) {
   const d = store.data;
-  const finished = d.challenges.filter((c) => WIN_STATUSES.includes(c.status)).length;
+  const ogs = d.court_reviews.filter((r) => r.og_spot && reviewValid(r) && courtById(r.court_id)).sort((x, y) => y.total - x.total);
+  const games = upcomingGames();
   const leaders = SPORTS.map((s) => ({ s, top: standings(s).slice(0, 3).filter((r) => r.courts || r.w) }));
 
   root.innerHTML = `
@@ -143,18 +160,27 @@ function landing(root) {
       </div>
       <div class="hero-nums">
         <div><b>${d.courts.length}</b><span>${t('land_courts')}</span></div>
+        <div><b>${ogs.length}</b><span>★ OG SPOT</span></div>
         <div><b>${d.teams.length}</b><span>${t('land_teams')}</span></div>
-        <div><b>${finished}</b><span>${t('land_matches')}</span></div>
+        <div><b>${games.length}</b><span>${t('land_games')}</span></div>
       </div>
     </section>
+
+    ${games.length ? `<h2 class="center">🤝 ${t('land_games_title')}</h2><div class="matches">${games.slice(0, 3).map((g) => gameCard(g)).join('')}</div>
+      <a class="btn ghost block" href="#/games">${t('g_see_all')} ›</a>` : ''}
+
+    ${ogs.length ? `<h2 class="center">★ ${t('spots_title')}</h2>
+      <div class="spot-list">${ogs.slice(0, 3).map((r) => { const c = courtById(r.court_id); return `<a class="spot" href="#/map/${esc(c.id)}"><div class="spot-ph">${SPORT_ICON[c.sport]}</div>
+        <div class="spot-body"><b>${esc(courtName(c))}</b><div>${ogBadge(r)}</div></div><div class="rv-score small good"><b>${r.total}</b><span>/100</span></div></a>`; }).join('')}</div>
+      <a class="btn ghost block" href="#/spots">${t('spots_all')} ›</a>` : ''}
 
     <h2 class="center">${t('how_title')}</h2>
     ${howItWorks()}
 
     <div class="features">
-      <div class="feature"><span>🃏</span><b>${t('feat1_t')}</b><p>${t('feat1_d')}</p></div>
-      <div class="feature"><span>🧑‍⚖️</span><b>${t('feat2_t')}</b><p>${t('feat2_d')}</p></div>
-      <div class="feature"><span>⭐</span><b>${t('feat3_t')}</b><p>${t('feat3_d')}</p></div>
+      <div class="feature"><span>★</span><b>${t('feat1_t')}</b><p>${t('feat1_d')}</p></div>
+      <div class="feature"><span>🤝</span><b>${t('feat2_t')}</b><p>${t('feat2_d')}</p></div>
+      <div class="feature"><span>🃏</span><b>${t('feat3_t')}</b><p>${t('feat3_d')}</p></div>
       <div class="feature"><span>📊</span><b>${t('feat4_t')}</b><p>${t('feat4_d')}</p></div>
     </div>
 
@@ -167,6 +193,7 @@ function landing(root) {
       <a class="btn primary big" href="#/login/register">${t('land_join')}</a>
       <p class="small muted">${t('land_login_q')} <a href="#/login">${t('login')}</a></p>
     </section>`;
+  bind(root, gameHandlers);
 }
 
 export function renderHome(root) {

@@ -39,7 +39,7 @@ export function renderTable(root) {
   const zs = zones();
   const owned = zs.filter((z) => z.owner).length;
   root.innerHTML = `
-    <div class="page-head"><h1>📊 ${t('table_title')}</h1></div>
+    <div class="page-head"><h1>📊 ${t('table_title')}</h1><a class="btn" href="#/teams">🛡️ ${t('nav_teams')}</a></div>
     <div class="seg wide">${['all', ...SPORTS].map((s) => `<button data-act="sport" data-s="${s}" class="${ui.sport === s ? 'on' : ''}">${s === 'all' ? t('all') : SPORT_ICON[s] + ' ' + t('sport_' + s)}</button>`).join('')}</div>
     <p class="small muted">${t('table_explain')}</p>
     ${sports.map((s) => `<h3>${SPORT_ICON[s]} ${t('sport_' + s)}</h3>${tableFor(s)}`).join('')}

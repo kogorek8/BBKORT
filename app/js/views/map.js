@@ -9,10 +9,13 @@ import { esc, bind, modal, toast, fmtDate, fmtDay, fmtLeft, fmtDist, teamTag, lo
 import {
   store, act, reload, now, T, teamById, myTeam, isCaptainOf, isAdmin, openChallengeForCourt, courtName, courtHistory,
   courtById, errText, ui, setSport, sportOk, zones, standings, lastCapture, rerender, courtRating, myCourtRating, profileById,
+  isOgSpot, reviewOf, upcomingGames, openIssues, isStaff,
 } from '../state.js';
+import { reviewBlock, ogBadge, openReviewEditor } from './spots.js';
+import { gameCard, gameHandlers, openCreateGame } from './games.js';
 
 let map, markers, zoneLayer, meMarker, meCircle, layers = {}, curLayer = null;
-let openCourtId = null, followedFirstFix = false, userMoved = false, showZones = true;
+let openCourtId = null, followedFirstFix = false, userMoved = false, showZones = true, ogOnly = false;
 const PREF = 'bbkort_layer';
 const POLAND = [[48.9, 14.0], [55.0, 24.3]];
 
@@ -76,6 +79,7 @@ export function initMap() {
     <button class="fab" data-act="zones" title="${t('map_zones')}">🚩</button>
     <button class="fab" data-act="locate" title="${t('map_locate')}">📍</button>
     <button class="fab" data-act="search" title="${t('map_search')}">🔍</button>
+    <button class="fab add" data-act="add" title="${t('add_court')}">＋</button>
     <div class="map-status" id="map-status"></div>`;
   bind(ctr, {
     layer: () => {
@@ -91,10 +95,12 @@ export function initMap() {
       else toast(t('gps_unavailable'), 'err');
     },
     search: () => importVisible(true),
+    add: openAddCourt,
   });
 
   bind(document.getElementById('map-top'), {
     sport: (d) => { setSport(d.s); rerender(); },
+    og: () => { ogOnly = !ogOnly; refreshMap(); },
   });
   bind(document.getElementById('court-sheet'), sheetHandlers);
   setTimeout(() => scheduleImport(), 1500);
@@ -137,7 +143,7 @@ function renderTop() {
     const top = standings(s)[0];
     return top && top.courts ? `<a class="leader" href="#/table" style="--c:${esc(top.team.color)}">${SPORT_ICON[s]} ${t('leader')}: ${teamTag(top.team)} · <b>${top.courts}</b> 👑 · <b>${top.zones}</b> 🚩</a>` : '';
   }).join('');
-  el.innerHTML = `<div class="seg sport-seg">${['all', ...SPORTS].map((s) => `<button data-act="sport" data-s="${s}" class="${ui.sport === s ? 'on' : ''}">${s === 'all' ? t('all') : SPORT_ICON[s]}</button>`).join('')}</div>
+  el.innerHTML = `<div class="seg sport-seg">${['all', ...SPORTS].map((s) => `<button data-act="sport" data-s="${s}" class="${ui.sport === s ? 'on' : ''}">${s === 'all' ? t('all') : SPORT_ICON[s]}</button>`).join('')}<button data-act="og" class="ogf ${ogOnly ? 'on' : ''}">★ OG</button></div>
     <div class="leaders">${leaders}</div>`;
 }
 
@@ -170,10 +176,12 @@ export function refreshMap() {
   markers.clearLayers();
   for (const c of store.data.courts) {
     if (!sportOk(c.sport)) continue;
+    const og = isOgSpot(c.id);
+    if (ogOnly && !og) continue;
     const k = c.king_team_id ? teamById(c.king_team_id) : null;
     const busy = !!openChallengeForCourt(c.id);
     const html = `<div class="pin ${k ? 'owned' : 'free'}" style="--c:${k ? esc(k.color) : '#9aa3b2'}">
-        <span class="pin-ball">${SPORT_ICON[c.sport] || '🏀'}</span>${k ? `<span class="pin-crown">👑</span><span class="pin-tag">${esc(k.tag)}</span>` : ''}${busy ? '<span class="pin-fight">⚔️</span>' : ''}
+        <span class="pin-ball">${SPORT_ICON[c.sport] || '🏀'}</span>${k ? `<span class="pin-crown">👑</span><span class="pin-tag">${esc(k.tag)}</span>` : ''}${busy ? '<span class="pin-fight">⚔️</span>' : ''}${og ? '<span class="pin-og">★</span>' : ''}${upcomingGames(c.id).length ? '<span class="pin-game">🤝</span>' : ''}
       </div>`;
     const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: '', html, iconSize: [44, 52], iconAnchor: [22, 48] }) });
     m.on('click', () => openCourt(c.id));
@@ -281,19 +289,31 @@ function renderSheet() {
     actions += `<a class="btn ghost block" href="#/matches">⚔️ ${t('challenged_by')} ${teamTag(ct)} · ${fmtDate(open.scheduled_at)}</a>`;
   }
 
+  const rv = reviewOf(c.id);
+  const games = upcomingGames(c.id);
+  const issues = openIssues(c.id);
   el.innerHTML = `
     <div class="sheet-handle" data-act="close"></div>
     <button class="sheet-x" data-act="close">×</button>
     <h2>${SPORT_ICON[c.sport]} ${esc(courtName(c))}</h2>
-    <div class="small muted">${t('sport_' + c.sport)} · ${esc(c.address || '')}${d != null ? ` · ${fmtDist(d)} ${t('from_you')}` : ''} · <span class="src">${esc(c.source)}</span></div>
+    <div class="small muted">${t('sport_' + c.sport)} · ${esc(c.address || '')}${d != null ? ` · ${fmtDist(d)} ${t('from_you')}` : ''}</div>
+    <div class="sheet-tags">${ogBadge(rv)}${rv ? `<span class="pill">${rv.total}/100</span>` : `<span class="pill">${t('not_reviewed')}</span>`}${issues.length ? `<span class="pill err">🔧 ${t('issues_n', { n: issues.length })}</span>` : ''}</div>
+    <div class="row quick">
+      <button class="btn primary" data-act="game-new">🤝 ${t('g_create')}</button>
+      <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}">🧭 ${t('navigate')}</a>
+      <button class="btn ghost" data-act="issue">🔧 ${t('report_issue')}</button>
+    </div>
+    ${games.length ? `<h4>🤝 ${t('g_here')}</h4><div class="matches">${games.map((g) => gameCard(g, false)).join('')}</div>` : ''}
+    ${isStaff() ? `<button class="btn staff block" data-act="og-edit">★ ${rv ? t('rv_edit') : t('rv_add')}</button>` : ''}
+    ${reviewBlock(c)}
+    <h4>👥 ${t('player_opinions')}</h4>
+    ${ratingBlock(c)}
+    ${issues.length ? `<h4>🔧 ${t('issues_title')}</h4><ul class="hist">${issues.map((i) => `<li>${esc(i.text)} <span class="muted small">· ${fmtDay(i.created_at)}</span>${isStaff() ? ` <button class="btn small ghost" data-act="issue-ok" data-id="${esc(i.id)}">✔ ${t('issue_resolve')}</button>` : ''}</li>`).join('')}</ul>` : ''}
+    <h4>👑 ${t('king_section')}</h4>
     ${kingHtml}
     <div class="sheet-actions">${actions}</div>
-    ${ratingBlock(c)}
-    <div class="row">
-      <a class="btn ghost small" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}">🧭 ${t('navigate')}</a>
-      ${isAdmin() ? `<button class="btn ghost small" data-act="reset">♻️ ${t('admin_reset_court')}</button>
-        <button class="btn ghost small danger" data-act="del">🗑️</button>` : ''}
-    </div>
+    ${isAdmin() ? `<div class="row"><button class="btn ghost small" data-act="reset">♻️ ${t('admin_reset_court')}</button>
+        <button class="btn ghost small danger" data-act="del">🗑️ ${t('admin_delete_court')}</button></div>` : ''}
     ${hist.length ? `<h4>${t('history')}</h4><ul class="hist">${hist.map(histLabel).join('')}</ul>` : ''}`;
   el.hidden = false;
 }
@@ -319,8 +339,42 @@ function ratingBlock(c) {
   </div>`;
 }
 
+function openAddCourt() {
+  if (!store.me) { location.hash = '#/login/register'; return; }
+  const ctr = map.getCenter();
+  modal(`<h3>＋ ${t('add_court')}</h3>
+    <p class="small muted">${t('add_court_hint')}</p>
+    <label>${t('court_name')}<input id="an" maxlength="80" placeholder="${t('court_name_ph')}"></label>
+    <div class="label">${t('sport')}</div>
+    <div class="seg wide" id="asp">${SPORTS.map((sp, i) => `<button data-s="${sp}" class="${i === 0 ? 'on' : ''}">${SPORT_ICON[sp]} ${t('sport_' + sp)}</button>`).join('')}</div>
+    <label>${t('court_address')}<input id="aa" maxlength="120"></label>
+    <div class="small muted">📍 ${ctr.lat.toFixed(5)}, ${ctr.lng.toFixed(5)} – ${t('add_court_pos')}</div>
+    <div class="row end"><button class="btn ghost" data-close>${t('cancel')}</button><button class="btn primary" id="ok">${t('add_court_send')}</button></div>`,
+  (m, close) => {
+    let sport = SPORTS[0];
+    m.querySelectorAll('#asp button').forEach((b) => (b.onclick = () => { sport = b.dataset.s; m.querySelectorAll('#asp button').forEach((x) => x.classList.toggle('on', x === b)); }));
+    m.querySelector('#ok').onclick = async () => {
+      const ok = await act('suggest_court', { p_name: m.querySelector('#an').value, p_sport: sport, p_lat: ctr.lat, p_lng: ctr.lng, p_address: m.querySelector('#aa').value },
+        isStaff() ? 'ok_court_added' : 'ok_court_suggested');
+      if (ok) close();
+    };
+  });
+}
+
 const sheetHandlers = {
+  ...gameHandlers,
   close: closeSheet,
+  'game-new': () => openCreateGame(openCourtId),
+  'og-edit': () => openReviewEditor(openCourtId),
+  'issue-ok': (d) => act('resolve_issue', { p_id: Number(d.id) || d.id }, 'ok_saved'),
+  issue() {
+    if (!store.me) { location.hash = '#/login/register'; return; }
+    const cid = openCourtId;
+    modal(`<h3>🔧 ${t('report_issue')}</h3><p class="small muted">${t('issue_hint')}</p>
+      <label>${t('issue_text')}<input id="it" maxlength="300" placeholder="${t('issue_ph')}"></label>
+      <div class="row end"><button class="btn ghost" data-close>${t('cancel')}</button><button class="btn primary" id="ok">${t('send')}</button></div>`,
+    (m, close) => { m.querySelector('#ok').onclick = async () => { if (await act('report_issue', { p_court: cid, p_text: m.querySelector('#it').value }, 'ok_issue')) close(); }; });
+  },
   rate() {
     const c = courtById(openCourtId);
     const mine = myCourtRating(c.id);

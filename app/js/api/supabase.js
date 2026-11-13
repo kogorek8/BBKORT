@@ -23,11 +23,15 @@ export async function create(cfg) {
     now: () => Date.now(),
     canImport: () => !!session,
     async load() {
-      const [teams, profiles, courts, challenges, challenge_players, court_history, court_ratings] = await Promise.all([
+      // tabele z migracji 2 i 3 są opcjonalne – ich brak nie psuje aplikacji
+      const [teams, profiles, courts, challenges, challenge_players, court_history,
+        court_ratings, court_reviews, team_requests, games, game_players, court_issues] = await Promise.all([
         all('teams'), all('profiles'), all('courts'), all('challenges'), all('challenge_players'), all('court_history'),
-        all('court_ratings', true), // tabela z migracji 2 – brak nie psuje aplikacji
+        all('court_ratings', true), all('court_reviews', true), all('team_requests', true),
+        all('games', true), all('game_players', true), all('court_issues', true),
       ]);
-      return { teams, profiles, courts, challenges, challenge_players, court_history, court_ratings };
+      return { teams, profiles, courts, challenges, challenge_players, court_history,
+        court_ratings, court_reviews, team_requests, games, game_players, court_issues };
     },
     async me(data) {
       if (!session) return null;

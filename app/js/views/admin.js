@@ -4,7 +4,7 @@ import { t } from '../i18n.js';
 import { H } from '../rules.js';
 import { ovr, tier, skillsOf } from '../skills.js';
 import { esc, bind, teamTag, fmtDate, fmtLeft, confirmBox } from '../ui.js';
-import { store, act, reload, teamById, isAdmin, isStaff, teamChallenges, now, T, errText } from '../state.js';
+import { store, act, reload, teamById, isAdmin, isStaff, teamChallenges, now, T, openIssues } from '../state.js';
 import { CITY_PRESETS, tiles, fetchArea } from '../courts-import.js';
 import { getMapBounds } from './map.js';
 import { SPORT_ICON } from '../rules.js';
@@ -82,7 +82,17 @@ function courtsTab() {
       <div class="row"><button class="btn primary" data-act="import-city" ${importing ? 'disabled' : ''}>⬇️ ${t('import_go')}</button>
         <button class="btn" data-act="import-view" ${importing ? 'disabled' : ''}>🗺️ ${t('import_view')}</button></div>
       <div id="imp-status" class="small"></div>
-    </div>`;
+    </div>
+    <h3>📥 ${t('pending_courts')} (${store.data.pending_courts.length})</h3>
+    ${store.data.pending_courts.map((c) => `<div class="review"><b>${SPORT_ICON[c.sport]} ${esc(c.name)}</b>
+      <div class="small muted">${esc(c.address || '')} · ${esc(store.data.profiles.find((p) => p.id === c.added_by)?.nick || '?')} ·
+        <a href="https://www.google.com/maps?q=${c.lat},${c.lng}" target="_blank" rel="noopener">📍 ${t('see_on_map')}</a></div>
+      <div class="row"><button class="btn primary small" data-act="court-yes" data-id="${esc(c.id)}">✔ ${t('approve')}</button>
+      <button class="btn ghost danger small" data-act="court-no" data-id="${esc(c.id)}">✖ ${t('reject')}</button></div></div>`).join('') || `<p class="muted small">${t('none')}</p>`}
+    <h3>🔧 ${t('issues_title')} (${openIssues().length})</h3>
+    ${openIssues().map((i) => `<div class="review"><a href="#/map/${esc(i.court_id)}"><b>${esc(store.data.courts.find((c) => c.id === i.court_id)?.name || t('court_unnamed'))}</b></a>
+      <div>${esc(i.text)}</div><div class="row"><button class="btn small" data-act="issue-ok" data-id="${esc(i.id)}">✔ ${t('issue_resolve')}</button></div></div>`).join('') || `<p class="muted small">${t('none')}</p>`}
+    <p class="small muted">★ ${t('rv_where')}</p>`;
 }
 
 async function runImport(root, box, label) {
@@ -121,7 +131,8 @@ function demoTab() {
 export function renderAdmin(root) {
   if (!isStaff()) { root.innerHTML = `<p class="muted">${t('err_not_staff')}</p>`; return; }
   const tabs = [['results', '📝 ' + t('tab_results')], ['skills', '⏳ ' + t('tab_skills')],
-    ...(isAdmin() ? [['courts', '📍 ' + t('tab_courts')], ['mods', '🧑‍⚖️ ' + t('tab_mods')]] : []), ...(api.mode === 'demo' ? [['demo', '🧪 Demo']] : [])];
+    ['courts', '📍 ' + t('tab_courts')],
+    ...(isAdmin() ? [['mods', '🧑‍⚖️ ' + t('tab_mods')]] : []), ...(api.mode === 'demo' ? [['demo', '🧪 Demo']] : [])];
   if (!tabs.some(([k]) => k === tab)) tab = 'results';
   const body = { results: resultsTab, skills: skillsTab, courts: courtsTab, mods: modsTab, demo: demoTab }[tab]();
 
@@ -141,6 +152,9 @@ export function renderAdmin(root) {
     approve: (d) => act('review_skills', { p_player: d.id, p_approve: true, p_note: note(d.id) }, 'ok_approved'),
     reject: (d) => act('review_skills', { p_player: d.id, p_approve: false, p_note: note(d.id) }, 'ok_rejected'),
     mod: (d) => act('admin_set_moderator', { p_player: d.id, p_on: d.on === '1' }, 'ok_saved'),
+    'court-yes': (d) => act('review_court', { p_court: d.id, p_approve: true }, 'ok_saved'),
+    'court-no': (d) => act('review_court', { p_court: d.id, p_approve: false }, 'ok_saved'),
+    'issue-ok': (d) => act('resolve_issue', { p_id: Number(d.id) || d.id }, 'ok_saved'),
     shift: (d) => api.demo.shiftTime(Number(d.h) * H),
     'import-city': () => { const c = root.querySelector('#city').value; runImport(root, CITY_PRESETS[c], c); },
     'import-view': () => {

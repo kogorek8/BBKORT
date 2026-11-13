@@ -17,7 +17,12 @@ export async function reload() {
     lastResolve = Date.now();
     try { await api.rpc('resolve_expired', {}); } catch { /* ignore */ }
   }
-  store.data = await api.load();
+  const d = await api.load();
+  for (const k of ['court_ratings', 'court_reviews', 'team_requests', 'games', 'game_players', 'court_issues']) d[k] = d[k] || [];
+  // boiska zgłoszone przez graczy czekają na akceptację – nie są jeszcze na mapie
+  d.pending_courts = d.courts.filter((c) => c.status === 'pending');
+  d.courts = d.courts.filter((c) => c.status !== 'pending');
+  store.data = d;
   store.me = await api.me(store.data);
   renderFn();
 }
@@ -152,3 +157,20 @@ export function courtRating(cid) {
   return { n: rows.length, avg, by, rows: rows.sort((a, b) => T(b.created_at) - T(a.created_at)) };
 }
 export const myCourtRating = (cid) => (store.me ? (store.data.court_ratings || []).find((r) => r.court_id === cid && r.player_id === store.me.id) : null);
+
+// ---- OG SPOT: oficjalna karta boiska
+export const reviewOf = (cid) => store.data.court_reviews.find((r) => r.court_id === cid) || null;
+export const reviewValid = (r) => !!r && Date.parse(r.valid_until) + 864e5 >= now();
+export const isOgSpot = (cid) => { const r = reviewOf(cid); return !!(r && r.og_spot && reviewValid(r)); };
+
+// ---- otwarte gry
+export const gamePlayers = (gid) => store.data.game_players.filter((x) => x.game_id === gid);
+export const upcomingGames = (cid) => store.data.games
+  .filter((g) => g.status === 'open' && T(g.starts_at) > now() - 2 * 3600e3 && (cid ? g.court_id === cid : sportOk(g.sport)) && courtById(g.court_id))
+  .sort((a, b) => T(a.starts_at) - T(b.starts_at));
+export const myGames = () => (store.me ? upcomingGames().filter((g) => gamePlayers(g.id).some((x) => x.player_id === store.me.id)) : []);
+
+// ---- usterki i prośby do drużyn
+export const openIssues = (cid) => store.data.court_issues.filter((i) => i.status === 'open' && (!cid || i.court_id === cid));
+export const teamRequests = (tid) => store.data.team_requests.filter((r) => r.team_id === tid);
+export const myTeamRequests = () => (store.me ? store.data.team_requests.filter((r) => r.player_id === store.me.id) : []);

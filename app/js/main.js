@@ -11,6 +11,8 @@ import { renderAdmin } from './views/admin.js';
 import { renderAuth } from './views/auth.js';
 import { renderTable } from './views/table.js';
 import { renderHome, renderHow } from './views/home.js';
+import { renderGames } from './views/games.js';
+import { renderSpots } from './views/spots.js';
 
 const $ = (id) => document.getElementById(id);
 let lastFocus = null;
@@ -40,13 +42,13 @@ function renderChrome() {
   const items = [
     ['home', '🏠', t('nav_home'), 0, 'home'],
     ['map', '🗺️', t('nav_map')],
+    ['games', '🤝', t('nav_games')],
     ['matches', '⚔️', t('nav_matches'), badge],
     ['table', '📊', t('nav_table')],
-    ['teams', '🛡️', t('nav_teams')],
-    ...(isStaff() ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => c.status === 'reported').length]] : []),
+    ...(isStaff() ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => c.status === 'reported').length + store.data.pending_courts.length]] : []),
   ];
   $('nav').innerHTML = items.map(([key, ic, label, n, href]) => {
-    const on = r === key || (key === 'teams' && (r === 'team' || r === 'player')) || (key === 'home' && r === 'how');
+    const on = r === key || (key === 'table' && (r === 'team' || r === 'teams')) || (key === 'home' && (r === 'how' || r === 'player' || r === 'spots'));
     return `<a href="#/${href || key}" class="${on ? 'on' : ''}"><span class="ic">${ic}${n ? `<i class="dot">${n}</i>` : ''}</span><span>${label}</span></a>`;
   }).join('');
 }
@@ -70,6 +72,8 @@ function render() {
   switch (r.name) {
     case 'home': return renderHome(page);
     case 'how': return renderHow(page);
+    case 'games': return renderGames(page);
+    case 'spots': return renderSpots(page);
     case 'table': return renderTable(page);
     case 'teams': return renderTeams(page);
     case 'team': return renderTeam(page, r.param);

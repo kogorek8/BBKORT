@@ -105,6 +105,18 @@ export async function fetchArea(b) {
 
 // Gotowe obszary miast (s, w, n, e) – do importu jednym kliknięciem w Panelu
 export const CITY_PRESETS = {
+  'Rzeszów': [49.96, 21.88, 50.11, 22.12],
+  'Podkarpacie (całe województwo)': [49.0, 21.1, 50.85, 23.6],
+  'Przemyśl': [49.74, 22.70, 49.82, 22.85],
+  'Stalowa Wola': [50.53, 22.00, 50.62, 22.12],
+  'Mielec': [50.25, 21.37, 50.33, 21.50],
+  'Tarnobrzeg': [50.53, 21.62, 50.62, 21.75],
+  'Krosno': [49.65, 21.70, 49.73, 21.82],
+  'Dębica': [50.02, 21.36, 50.08, 21.46],
+  'Jarosław': [49.98, 22.63, 50.05, 22.73],
+  'Sanok': [49.53, 22.16, 49.60, 22.25],
+  'Jasło': [49.72, 21.42, 49.78, 21.52],
+  'Łańcut': [50.04, 22.19, 50.10, 22.27],
   'Warszawa': [52.09, 20.85, 52.37, 21.28],
   'Kraków': [49.97, 19.79, 50.13, 20.22],
   'Łódź': [51.68, 19.32, 51.86, 19.64],
@@ -127,6 +139,8 @@ export const CITY_PRESETS = {
 
 // dzieli duży obszar na kafelki ~10 km, żeby nie przeciążyć serwera
 export function tiles([s, w, n, e], dLat = 0.09, dLng = 0.14) {
+  // duży obszar (np. województwo) → większe kafelki, mniej zapytań
+  if ((n - s) * (e - w) > 0.5) { dLat = 0.47; dLng = 0.65; }
   const out = [];
   for (let a = s; a < n; a += dLat) for (let b = w; b < e; b += dLng) {
     out.push({ s: a, w: b, n: Math.min(a + dLat, n), e: Math.min(b + dLng, e) });

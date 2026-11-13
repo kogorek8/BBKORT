@@ -2,10 +2,10 @@
 //  TRYB DEMO – wszystko w localStorage tej przeglądarki.
 //  Logika 1:1 z funkcjami RPC w supabase/schema.sql.
 // =====================================================================
-import { RULES, OPEN_STATUSES, SPORTS, distM, H, M } from '../rules.js';
+import { RULES, OPEN_STATUSES, SPORTS, REVIEW_AREAS, OG_MIN_TOTAL, OG_MIN, distM, H, M } from '../rules.js';
 import { skillKeys } from '../skills.js';
 
-const KEY = 'bbkort_demo_v3';
+const KEY = 'bbkort_demo_v4';
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const err = (code) => new Error(code);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -23,12 +23,12 @@ function seed() {
   const iso = (ms) => new Date(ms).toISOString();
   const day = 24 * H;
   const teams = [
-    ['t1', 'Mokotów Ballers', 'MKB', '#ff7a1a', 'basketball', 'u1'],
-    ['t2', 'Praga Hoopers', 'PRH', '#2ec4b6', 'basketball', 'u4'],
-    ['t3', 'Wola Dunk Squad', 'WDS', '#9b5de5', 'basketball', 'u7'],
-    ['t4', 'Ursynów Kings', 'URK', '#f15bb5', 'basketball', 'u9'],
-    ['f1', 'Żoliborz FC', 'ZFC', '#3a86ff', 'football', 'u20'],
-    ['f2', 'Grochów United', 'GRU', '#ef233c', 'football', 'u23'],
+    ['t1', 'Baranówka Ballers', 'BRB', '#ff7a1a', 'basketball', 'u1'],
+    ['t2', 'Nowe Miasto Hoopers', 'NMH', '#2ec4b6', 'basketball', 'u4'],
+    ['t3', 'Drabinianka Dunk', 'DRD', '#9b5de5', 'basketball', 'u7'],
+    ['t4', 'Zalesie Kings', 'ZLK', '#f15bb5', 'basketball', 'u9'],
+    ['f1', 'Staromieście FC', 'SFC', '#3a86ff', 'football', 'u20'],
+    ['f2', 'Pobitno United', 'PBU', '#ef233c', 'football', 'u23'],
   ].map(([id, name, tag, color, sport, captain_id]) => ({ id, name, tag, color, sport, captain_id, rating: null, created_at: iso(now - 30 * day) }));
 
   let n = 0;
@@ -66,19 +66,19 @@ function seed() {
   const C = (id, name, sport, lat, lng, address, king, daysAgo, defenses = 0) => ({
     id, external_id: 'demo:' + id, name, sport, lat, lng, address, source: 'demo',
     king_team_id: king, king_since: king ? iso(now - daysAgo * day) : null,
-    protected_until: null, defenses, created_at: iso(now - 40 * day),
+    protected_until: null, defenses, status: 'active', added_by: null, photo_url: null, created_at: iso(now - 40 * day),
   });
   const courts = [
-    C('c1', 'Pole Mokotowskie – kosz', 'basketball', 52.2128, 21.0005, 'al. Niepodległości', 't1', 9, 4),
-    C('c2', 'Park Skaryszewski', 'basketball', 52.2418, 21.0510, 'al. Zieleniecka', 't2', 3, 1),
-    C('c3', 'Orlik Wola – kosz', 'basketball', 52.2335, 20.9690, 'ul. Ogrodowa', 't3', 6, 2),
-    C('c4', 'Kabaty – boisko osiedlowe', 'basketball', 52.1310, 21.0650, 'ul. Wąwozowa', 't4', 12, 6),
-    C('c5', 'Bulwary Wiślane', 'basketball', 52.2400, 21.0300, 'Bulwar Flotylli Wiślanej', null),
-    C('c6', 'Ochota – Park Szczęśliwicki', 'basketball', 52.2160, 20.9790, 'ul. Drawska', null),
-    C('c10', 'Pole Mokotowskie – kosz 2', 'basketball', 52.2140, 21.0040, 'ul. Żwirki i Wigury', 't1', 5, 1),
-    C('c7', 'Orlik Żoliborz', 'football', 52.2680, 20.9850, 'ul. Felińskiego', 'f1', 8, 3),
-    C('c8', 'Orlik Grochów', 'football', 52.2450, 21.0880, 'ul. Grochowska', 'f2', 4, 1),
-    C('c9', 'Boisko Pole Mokotowskie', 'football', 52.2110, 20.9960, 'al. Niepodległości', null),
+    C('c1', 'Bulwary nad Wisłokiem – kosz', 'basketball', 50.0335, 22.0010, 'Bulwary', 't1', 9, 4),
+    C('c2', 'Park Papieski', 'basketball', 50.0155, 21.9960, 'ul. Sikorskiego', 't2', 3, 1),
+    C('c3', 'Baranówka – orlik (kosz)', 'basketball', 50.0560, 21.9850, 'ul. Obrońców Poczty Gdańskiej', 't3', 6, 2),
+    C('c4', 'Nowe Miasto – boisko osiedlowe', 'basketball', 50.0190, 22.0200, 'ul. Podwisłocze', 't4', 12, 6),
+    C('c5', 'Lisia Góra', 'basketball', 50.0240, 22.0000, 'ul. Kwiatkowskiego', null),
+    C('c6', 'Zalesie – boisko', 'basketball', 50.0080, 22.0330, 'ul. Zelwerowicza', null),
+    C('c10', 'Bulwary nad Wisłokiem – kosz 2', 'basketball', 50.0352, 22.0035, 'Bulwary', 't1', 5, 1),
+    C('c7', 'Orlik Staromieście', 'football', 50.0620, 22.0000, 'ul. Partyzantów', 'f1', 8, 3),
+    C('c8', 'Orlik Pobitno', 'football', 50.0430, 22.0300, 'ul. Konfederatów Barskich', 'f2', 4, 1),
+    C('c9', 'Boisko Drabinianka', 'football', 50.0150, 22.0180, 'ul. Graniczna', null),
   ];
 
   const ch = (o) => ({
@@ -114,26 +114,55 @@ function seed() {
     ['c7', 'f1', 'claim', null, 8], ['c8', 'f2', 'claim', null, 4],
   ].map(([court_id, team_id, event, challenge_id, d], i) => ({ id: i + 1, court_id, team_id, event, challenge_id, at: iso(now - d * day) }));
 
-  const R5 = (o) => o;
   const court_ratings = [
-    ['c1', 'u1', { surface: 4, hoops: 5, lighting: 3, access: 4, vibe: 5 }, 'Najlepsze kosze w okolicy, wieczorem tłoczno.'],
-    ['c1', 'u4', { surface: 4, hoops: 4, lighting: 2, access: 3, vibe: 5 }, 'Słabe światło po 20:00.'],
-    ['c2', 'u7', { surface: 3, hoops: 3, lighting: 4, access: 5, vibe: 4 }, null],
-    ['c3', 'u9', { surface: 5, hoops: 5, lighting: 5, access: 3, vibe: 4 }, 'Orlik zamykany o 22.'],
-    ['c7', 'u23', { surface: 4, hoops: 5, lighting: 5, access: 2, vibe: 4 }, 'Trzeba rezerwować u gospodarza.'],
-    ['c5', 'u2', { surface: 2, hoops: 3, lighting: 1, access: 5, vibe: 5 }, 'Super klimat nad Wisłą, ale nierówny asfalt.'],
-  ].map(([court_id, player_id, scores, comment], i) => R5({ court_id, player_id, scores, comment, created_at: iso(now - (i + 1) * day) }));
+    ['c1', 'u1', { comfort: 5, return: 5, vibe: 5 }, 'Najlepsze kosze w mieście, wieczorem tłoczno.'],
+    ['c1', 'u4', { comfort: 4, return: 5, vibe: 4 }, 'Słabe światło po 20:00.'],
+    ['c2', 'u7', { comfort: 3, return: 4, vibe: 4 }, null],
+    ['c3', 'u9', { comfort: 5, return: 4, vibe: 4 }, 'Orlik zamykany o 22.'],
+    ['c7', 'u23', { comfort: 4, return: 3, vibe: 4 }, 'Trzeba rezerwować u gospodarza.'],
+    ['c5', 'u2', { comfort: 2, return: 4, vibe: 5 }, 'Super klimat, ale nierówny asfalt.'],
+  ].map(([court_id, player_id, scores, comment], i) => ({ court_id, player_id, scores, comment, created_at: iso(now - (i + 1) * day) }));
+
+  const dstr = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const court_reviews = [
+    { court_id: 'c1', reviewer_id: 'admin', visited_at: dstr(now - 20 * day), valid_until: dstr(now + 345 * day),
+      scores: { surface: 22, hoop: 18, space: 12, lines: 8, access: 9, surroundings: 4, regular: 4, players: 9 }, total: 86,
+      hazard: false, og_spot: true, og_number: 1,
+      summary: 'Równa nawierzchnia poliuretanowa, piłka odbija równo we wszystkich 5 punktach. Kosz na przepisowej wysokości, sztywna obręcz. Boisko żyje – wieczorami zawsze ktoś gra.',
+      pros: ['Równe odbicie piłki na całym polu', 'Solidna obręcz i nowa siatka', 'Dostępne 24/7, bez opłat'],
+      cons: ['Słabe oświetlenie po zmroku', 'Brak cienia latem'],
+      suggestions: [{ text: 'Doświetlić strefę pod koszem', kind: 'invest' }, { text: 'Odmalować linię rzutów wolnych', kind: 'cheap' }],
+      photos: [], video_url: 'https://www.youtube.com/', updated_at: iso(now - 19 * day) },
+    { court_id: 'c3', reviewer_id: 'admin', visited_at: dstr(now - 9 * day), valid_until: dstr(now + 356 * day),
+      scores: { surface: 19, hoop: 10, space: 13, lines: 9, access: 6, surroundings: 4, regular: 4, players: 7 }, total: 72,
+      hazard: false, og_spot: false, og_number: null,
+      summary: 'Dobre boisko z dużą przestrzenią, ale kosz wymaga naprawy: luźna obręcz i brak siatki. Po poprawkach zapraszamy do ponownej oceny.',
+      pros: ['Dużo miejsca do wybiegania', 'Czytelne linie'],
+      cons: ['Luźna obręcz', 'Zamykane o 22:00'],
+      suggestions: [{ text: 'Dokręcić mocowanie obręczy', kind: 'urgent' }, { text: 'Założyć metalową siatkę', kind: 'cheap' }],
+      photos: [], video_url: null, updated_at: iso(now - 8 * day) },
+  ];
+  const team_requests = [{ team_id: 't1', player_id: 'u11', kind: 'request', created_at: iso(now - 5 * H) }];
+  const games = [
+    { id: 'g1', court_id: 'c1', host_id: 'u2', sport: 'basketball', starts_at: iso(now + 3 * H), slots: 6, level: 'all', note: 'Luźne 3 na 3, każdy mile widziany', status: 'open', created_at: iso(now - 2 * H) },
+    { id: 'g2', court_id: 'c5', host_id: 'u6', sport: 'basketball', starts_at: iso(now + 27 * H), slots: 10, level: 'mid', note: 'Gramy 5 na 5, weźcie wodę', status: 'open', created_at: iso(now - 1 * H) },
+    { id: 'g3', court_id: 'c9', host_id: 'u21', sport: 'football', starts_at: iso(now + 50 * H), slots: 12, level: 'beginner', note: null, status: 'open', created_at: iso(now - 3 * H) },
+  ];
+  const game_players = [['g1', 'u2'], ['g1', 'u5'], ['g1', 'u8'], ['g2', 'u6'], ['g2', 'u1'], ['g2', 'u4'], ['g2', 'u10'], ['g3', 'u21'], ['g3', 'u24']]
+    .map(([game_id, player_id]) => ({ game_id, player_id, joined_at: iso(now - H) }));
+  const court_issues = [{ id: 1, court_id: 'c3', player_id: 'u8', text: 'Obręcz się rusza, brak siatki', status: 'open', created_at: iso(now - 2 * day) }];
 
   return {
-    version: 3, time_offset: 0, fake_gps: true, current_user: 'admin',
+    version: 4, time_offset: 0, fake_gps: true, current_user: 'admin',
     teams, profiles, courts, challenges, challenge_players, court_history, court_ratings,
+    court_reviews, team_requests, games, game_players, court_issues,
   };
 }
 
 export function create() {
   let S;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch { S = null; }
-  if (!S || S.version !== 3) S = seed();
+  if (!S || S.version !== 4) S = seed();
 
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* ignore */ } };
   const now = () => Date.now() + S.time_offset;
@@ -161,6 +190,12 @@ export function create() {
   const ghost = (pid) => { const p = S.profiles.find((x) => x.id === pid); if (p) p.ghost_count++; };
   const history = (court_id, team_id, event, challenge_id = null) =>
     S.court_history.push({ id: Date.now() + Math.random(), court_id, team_id, event, challenge_id, at: iso(now()) });
+  const joinTeam = (tid, pid) => {
+    const x = S.profiles.find((q) => q.id === pid);
+    if (x.team_id) throw err('err_already_in_team');
+    Object.assign(x, { team_id: tid, sport: team(tid).sport });
+    S.team_requests = S.team_requests.filter((r) => r.player_id !== pid);
+  };
   const validScore = (a, b) => Number.isInteger(a) && Number.isInteger(b) && a >= 0 && b >= 0 && a !== b;
 
   function finalize(ch, winner, status, note, by) {
@@ -218,12 +253,35 @@ export function create() {
       Object.assign(p, { team_id: id, sport: p_sport });
       return id;
     },
-    join_team({ p_team }) {
+    join_team({ p_team }) { return R.request_join({ p_team }); },
+    request_join({ p_team }) {
       const p = me();
       if (p.team_id) throw err('err_already_in_team');
-      const tm = team(p_team);
-      if (!tm) throw err('err_not_found');
-      Object.assign(p, { team_id: p_team, sport: tm.sport });
+      if (!team(p_team)) throw err('err_not_found');
+      if (S.team_requests.some((r) => r.team_id === p_team && r.player_id === p.id && r.kind === 'invite')) { joinTeam(p_team, p.id); return 'joined'; }
+      if (!S.team_requests.some((r) => r.team_id === p_team && r.player_id === p.id)) S.team_requests.push({ team_id: p_team, player_id: p.id, kind: 'request', created_at: iso(now()) });
+      return 'requested';
+    },
+    invite_player({ p_player }) {
+      const p = me();
+      if (!p.team_id || !isCap(p.id, p.team_id)) throw err('err_not_captain');
+      const x = S.profiles.find((q) => q.id === p_player);
+      if (!x) throw err('err_not_found');
+      if (x.team_id) throw err('err_player_in_team');
+      if (S.team_requests.some((r) => r.team_id === p.team_id && r.player_id === p_player && r.kind === 'request')) { joinTeam(p.team_id, p_player); return 'joined'; }
+      if (!S.team_requests.some((r) => r.team_id === p.team_id && r.player_id === p_player)) S.team_requests.push({ team_id: p.team_id, player_id: p_player, kind: 'invite', created_at: iso(now()) });
+      return 'invited';
+    },
+    respond_team_request({ p_team, p_player, p_accept }) {
+      const p = me();
+      const r = S.team_requests.find((x) => x.team_id === p_team && x.player_id === p_player);
+      if (!r) throw err('err_not_found');
+      const cap = isCap(p.id, p_team);
+      if (!cap && p.id !== p_player) throw err('err_not_allowed');
+      if (p_accept) {
+        if ((r.kind === 'request' && !cap) || (r.kind === 'invite' && p.id !== p_player)) throw err('err_not_allowed');
+        joinTeam(p_team, p_player);
+      } else S.team_requests = S.team_requests.filter((x) => x !== r);
     },
     leave_team() {
       const p = me();
@@ -260,7 +318,7 @@ export function create() {
         if (S.courts.some((c) => c.sport === sp && distM(c.lat, c.lng, r.lat, r.lng) < 40)) continue;
         S.courts.push({
           id: 'c' + uid(), external_id: r.external_id, name: (r.name || '').slice(0, 80), sport: sp, lat: r.lat, lng: r.lng,
-          address: (r.address || '').slice(0, 120), source: r.source || 'manual',
+          address: (r.address || '').slice(0, 120), source: r.source || 'manual', status: 'active', added_by: null, photo_url: null,
           king_team_id: null, king_since: null, protected_until: null, defenses: 0, created_at: iso(now()),
         });
         n++;
@@ -413,6 +471,86 @@ export function create() {
       admin();
       S.court_ratings = S.court_ratings.filter((r) => !(r.court_id === p_court && r.player_id === p_player));
     },
+    // ---- OG SPOT: oficjalna karta boiska
+    save_court_review({ p_court, p_data }) {
+      const p = staff();
+      getCourt(p_court);
+      const sc = p_data?.scores || {};
+      let total = 0;
+      for (const a of REVIEW_AREAS) {
+        const v = Number(sc[a.key]);
+        if (!Number.isInteger(v) || v < 0 || v > a.max) throw err('err_bad_review');
+        total += v;
+      }
+      const hazard = !!p_data.hazard;
+      const og = total >= OG_MIN_TOTAL && !hazard && Object.entries(OG_MIN).every(([k, m]) => sc[k] >= m);
+      const old = S.court_reviews.find((r) => r.court_id === p_court);
+      let num = old?.og_number ?? null;
+      if (og && num == null) num = Math.max(0, ...S.court_reviews.map((r) => r.og_number || 0)) + 1;
+      const vis = p_data.visited_at || new Date(now()).toISOString().slice(0, 10);
+      const until = new Date(Date.parse(vis) + 365 * 24 * H).toISOString().slice(0, 10);
+      S.court_reviews = S.court_reviews.filter((r) => r.court_id !== p_court);
+      S.court_reviews.push({
+        court_id: p_court, reviewer_id: p.id, visited_at: vis, valid_until: until, scores: sc, total, hazard, og_spot: og, og_number: num,
+        summary: (p_data.summary || '').trim() || null, pros: p_data.pros || [], cons: p_data.cons || [],
+        suggestions: p_data.suggestions || [], photos: p_data.photos || [], video_url: (p_data.video_url || '').trim() || null, updated_at: iso(now()),
+      });
+      if ('photo_url' in p_data) getCourt(p_court).photo_url = (p_data.photo_url || '').trim() || null;
+    },
+    delete_court_review({ p_court }) { admin(); S.court_reviews = S.court_reviews.filter((r) => r.court_id !== p_court); },
+    // ---- boiska zgłaszane przez graczy
+    suggest_court({ p_name, p_sport, p_lat, p_lng, p_address }) {
+      const p = me();
+      if (!SPORTS.includes(p_sport) || p_lat == null || p_lng == null || (p_name || '').trim().length < 3) throw err('err_bad_request');
+      if (S.courts.some((c) => c.sport === p_sport && distM(c.lat, c.lng, p_lat, p_lng) < 40)) throw err('err_court_exists');
+      const isStaff = p.is_admin || p.is_moderator;
+      const id = 'c' + uid();
+      S.courts.push({ id, external_id: null, name: p_name.trim().slice(0, 80), sport: p_sport, lat: p_lat, lng: p_lng, address: (p_address || '').slice(0, 120),
+        source: 'user', status: isStaff ? 'active' : 'pending', added_by: p.id, photo_url: null,
+        king_team_id: null, king_since: null, protected_until: null, defenses: 0, created_at: iso(now()) });
+      return id;
+    },
+    review_court({ p_court, p_approve }) {
+      staff();
+      const c = getCourt(p_court);
+      if (c.status !== 'pending') return;
+      if (p_approve) c.status = 'active'; else S.courts = S.courts.filter((x) => x.id !== p_court);
+    },
+    // ---- otwarte gry
+    create_game({ p_court, p_time, p_slots, p_level, p_note }) {
+      const p = me();
+      const c = getCourt(p_court);
+      const t = T(p_time);
+      if (isNaN(t) || t < now() - 10 * M || t > now() + 30 * 24 * H) throw err('err_bad_time_game');
+      if (!Number.isInteger(p_slots) || p_slots < 2 || p_slots > 40) throw err('err_bad_request');
+      const id = 'g' + uid();
+      S.games.push({ id, court_id: c.id, host_id: p.id, sport: c.sport, starts_at: iso(t), slots: p_slots, level: p_level || 'all', note: (p_note || '').trim().slice(0, 200) || null, status: 'open', created_at: iso(now()) });
+      S.game_players.push({ game_id: id, player_id: p.id, joined_at: iso(now()) });
+      return id;
+    },
+    join_game({ p_game }) {
+      const p = me();
+      const g = S.games.find((x) => x.id === p_game && x.status === 'open');
+      if (!g) throw err('err_not_found');
+      if (S.game_players.some((x) => x.game_id === g.id && x.player_id === p.id)) return;
+      if (S.game_players.filter((x) => x.game_id === g.id).length >= g.slots) throw err('err_game_full');
+      S.game_players.push({ game_id: g.id, player_id: p.id, joined_at: iso(now()) });
+    },
+    leave_game({ p_game }) {
+      const p = me();
+      const g = S.games.find((x) => x.id === p_game);
+      if (!g) return;
+      if (g.host_id === p.id || p.is_admin) g.status = 'cancelled';
+      else S.game_players = S.game_players.filter((x) => !(x.game_id === g.id && x.player_id === p.id));
+    },
+    // ---- usterki
+    report_issue({ p_court, p_text }) {
+      const p = me();
+      getCourt(p_court);
+      if ((p_text || '').trim().length < 3) throw err('err_bad_request');
+      S.court_issues.push({ id: Date.now(), court_id: p_court, player_id: p.id, text: p_text.trim().slice(0, 300), status: 'open', created_at: iso(now()) });
+    },
+    resolve_issue({ p_id }) { staff(); const i = S.court_issues.find((x) => String(x.id) === String(p_id)); if (i) i.status = 'resolved'; },
     // ---- admin
     admin_set_moderator({ p_player, p_on }) {
       admin();
@@ -442,8 +580,10 @@ export function create() {
     now,
     canImport: () => true,
     async load() {
-      const { teams, profiles, courts, challenges, challenge_players, court_history, court_ratings } = S;
-      return clone({ teams, profiles, courts, challenges, challenge_players, court_history, court_ratings: court_ratings || [] });
+      const { teams, profiles, courts, challenges, challenge_players, court_history, court_ratings,
+        court_reviews, team_requests, games, game_players, court_issues } = S;
+      return clone({ teams, profiles, courts, challenges, challenge_players, court_history, court_ratings,
+        court_reviews, team_requests, games, game_players, court_issues });
     },
     async me(data) { return data.profiles.find((p) => p.id === S.current_user) || null; },
     async rpc(name, args) {

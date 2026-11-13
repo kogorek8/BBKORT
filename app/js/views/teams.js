@@ -5,11 +5,11 @@ import { SPORTS, SPORT_ICON } from '../rules.js';
 import { esc, bind, modal, teamTag, fmtDate, confirmBox } from '../ui.js';
 import {
   store, act, teamById, members, courtsOf, teamRecord, myTeam, isCaptainOf, teamChallenges, courtName,
-  ui, setSport, sportOk, standings,
+  ui, setSport, sportOk, standings, teamRequests, profileById,
 } from '../state.js';
 import { challengeCard, challengeHandlers } from './matches.js';
 
-let sortMode = 'rank', query = '';
+let sortMode = 'rank', query = '', inviteQ = '';
 
 export function playerMini(p, team) {
   const o = playerOvr(p, team ? team.sport : p.sport);
@@ -110,6 +110,27 @@ export function renderTeam(root, id) {
   const cap = isCaptainOf(tm.id);
   const matches = teamChallenges(tm.id).slice(0, 8);
 
+  // dołączanie: zgoda obu stron (gracz prosi → kapitan akceptuje, albo kapitan zaprasza → gracz akceptuje)
+  const reqs = teamRequests(tm.id);
+  const mineReq = me ? reqs.find((r) => r.player_id === me.id) : null;
+  let joinUi = '';
+  if (me && !me.team_id) {
+    if (!mineReq) joinUi = `<button class="btn primary" data-act="join">✋ ${t('ask_to_join')}</button>`;
+    else if (mineReq.kind === 'request') joinUi = `<span class="pill">⏳ ${t('request_sent')}</span><button class="btn ghost small" data-act="req-no" data-id="${esc(me.id)}">${t('withdraw')}</button>`;
+    else joinUi = `<span class="pill ok">📩 ${t('you_are_invited')}</span><button class="btn primary" data-act="req-yes" data-id="${esc(me.id)}">${t('accept_invite')}</button><button class="btn ghost" data-act="req-no" data-id="${esc(me.id)}">${t('decline')}</button>`;
+  } else if (!me) joinUi = `<a class="btn primary" href="#/login/register">✋ ${t('ask_to_join')}</a>`;
+  const ql = inviteQ.trim().toLowerCase();
+  const candidates = cap && ql.length >= 2 ? store.data.profiles.filter((p) => !p.team_id && p.nick.toLowerCase().includes(ql) && !reqs.some((r) => r.player_id === p.id)).slice(0, 6) : [];
+  const capUi = cap ? `
+    <h3>📥 ${t('join_requests')} (${reqs.filter((r) => r.kind === 'request').length})</h3>
+    ${reqs.filter((r) => r.kind === 'request').map((r) => { const p = profileById(r.player_id); return p ? `<div class="roster-item">${playerMini(p, null)}
+      <button class="btn small primary" data-act="req-yes" data-id="${esc(p.id)}">✔</button><button class="btn small ghost danger" data-act="req-no" data-id="${esc(p.id)}">✕</button></div>` : ''; }).join('') || `<p class="muted small">${t('none')}</p>`}
+    <h3>📩 ${t('invite_player')}</h3>
+    <input type="search" id="iq" placeholder="${t('search_player')}" value="${esc(inviteQ)}">
+    ${candidates.map((p) => `<div class="roster-item">${playerMini(p, null)}<button class="btn small primary" data-act="invite" data-id="${esc(p.id)}">${t('invite')}</button></div>`).join('')}
+    ${reqs.filter((r) => r.kind === 'invite').map((r) => { const p = profileById(r.player_id); return p ? `<div class="roster-item">${playerMini(p, null)}<span class="pill">⏳ ${t('invited')}</span>
+      <button class="btn small ghost" data-act="req-no" data-id="${esc(p.id)}">${t('withdraw')}</button></div>` : ''; }).join('')}` : '';
+
   root.innerHTML = `
     <a class="back" href="#/teams">← ${t('nav_teams')}</a>
     <div class="team-hero" style="--c:${esc(tm.color)}">
@@ -126,21 +147,27 @@ export function renderTeam(root, id) {
       <div class="stat"><b>${ms.length}</b><span>${t('players')}</span></div>
     </div>
     <div class="row">
-      ${me && !me.team_id ? `<button class="btn primary" data-act="join">${t('join_team')}</button>` : ''}
+      ${joinUi}
       ${isMember ? `<button class="btn ghost danger" data-act="leave">${t('leave_team')}</button>` : ''}
     </div>
     <h3>${t('roster')}</h3>
     <div class="roster">${ms.map((p) => `<div class="roster-item">${playerMini(p, tm)}
       ${cap && p.id !== me.id ? `<button class="icon-btn" data-act="kick" data-id="${esc(p.id)}" title="${t('kick')}">✕</button>` : ''}</div>`).join('')}</div>
+    ${capUi}
     <h3>👑 ${t('courts_held')}</h3>
     ${courts.length ? `<ul class="clist">${courts.map((c) => `<li><a href="#/map/${esc(c.id)}">${esc(courtName(c))}</a> <span class="muted small">· ${t('defenses')}: ${c.defenses}</span></li>`).join('')}</ul>` : `<p class="muted">${t('no_courts')}</p>`}
     <h3>${t('recent_matches')}</h3>
     <div class="matches">${matches.map((c) => challengeCard(c, true)).join('') || `<p class="muted">${t('no_matches')}</p>`}</div>
     <p class="small muted">* ${t('rating_temp')}</p>`;
 
+  const iq = root.querySelector('#iq');
+  if (iq) iq.oninput = () => { inviteQ = iq.value; renderTeam(root, id); const i = root.querySelector('#iq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
   bind(root, {
     ...challengeHandlers,
-    join: () => act('join_team', { p_team: tm.id }, 'ok_joined'),
+    join: () => act('request_join', { p_team: tm.id }, 'ok_request_sent'),
+    'req-yes': (d) => act('respond_team_request', { p_team: tm.id, p_player: d.id, p_accept: true }, 'ok_joined'),
+    'req-no': (d) => act('respond_team_request', { p_team: tm.id, p_player: d.id, p_accept: false }, 'ok_saved'),
+    invite: (d) => act('invite_player', { p_player: d.id }, 'ok_invited'),
     leave: async () => { if (await confirmBox(t('leave_team_confirm'))) act('leave_team', {}, 'ok_left'); },
     kick: async (d) => { if (await confirmBox(t('kick') + '?')) act('kick_member', { p_player: d.id }, 'ok_saved'); },
   });

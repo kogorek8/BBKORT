@@ -20,8 +20,8 @@ export const CONFIG = {
   MAPBOX_TOKEN: '',
   MAPTILER_KEY: '',
 
-  // Start mapy, zanim telefon poda lokalizację (Warszawa)
-  DEFAULT_CENTER: [52.2297, 21.0122],
+  // Start mapy, zanim telefon poda lokalizację (Rzeszów)
+  DEFAULT_CENTER: [50.0375, 22.0047],
   DEFAULT_ZOOM: 13,
 
   // Automatyczne pobieranie boisk przy przesuwaniu mapy (od tego zoomu)

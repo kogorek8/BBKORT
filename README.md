@@ -1,4 +1,13 @@
-# BBKORT – King of the Court 🏀⚽👑
+# BBKORT – boiska sprawdzone w grze, ekipa do gry, walka o teren 🏀⚽
+
+> **Instrukcja publikacji i sklepów:** [docs/INSTRUKCJA-PUBLIKACJA.md](docs/INSTRUKCJA-PUBLIKACJA.md)
+>
+> **Aktualizacja bazy po każdej nowej wersji** (Supabase → SQL Editor → Database → Run):
+> ```sql
+> do $$ begin execute (select content from extensions.http_get('https://raw.githubusercontent.com/kogorek8/BBKORT/claude/bbkort-web-app-30zfsx/supabase/aktualizacja-bez-komentarzy.sql')); end $$;
+> ```
+>
+> Nowe w tej wersji: oficjalne karty boisk **OG SPOT** (100 pkt w 8 obszarach), **Gramy?** (otwarte gry), dołączanie do drużyn za zgodą obu stron, dodawanie boisk i zgłaszanie usterek, start mapy w Rzeszowie.
 
 Aplikacja webowa (PWA) dla koszykarzy i piłkarzy, inspirowana grami terenowymi. Na **mapie satelitarnej** widać boiska i kto nimi rządzi. Drużyny **przejmują boiska i teren**, a inne drużyny mogą je **publicznie wyzwać**. Wynik każdego meczu zatwierdza **sędzia BBKORT**. Zawodnicy mają **karty umiejętności w stylu gier sportowych**.
 
