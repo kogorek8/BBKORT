@@ -652,3 +652,4 @@ textarea { width: 100%; background: var(--bg2); border: 1px solid var(--line); c
 .hero .hero-title { font-size: 3.4rem; font-weight: 900; font-style: italic; letter-spacing: .01em; line-height: 1; margin: 6px 0 8px; }
 .hero .hero-title span { color: var(--accent); }
 .hero-tag { font-size: .82rem; font-weight: 800; letter-spacing: .22em; color: var(--accent2); text-transform: uppercase; }
+.hero-tag2 { font-size: .8rem; font-style: italic; color: var(--muted); margin-top: 4px; letter-spacing: .04em; }

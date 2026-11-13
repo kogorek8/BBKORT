@@ -210,6 +210,7 @@ function landing(root) {
       ${heroArt()}
       <h1 class="hero-title">OG <span>SPOT</span></h1>
       <div class="hero-tag">${t('land_tag')}</div>
+      <div class="hero-tag2">${t('land_tag2')}</div>
       <p>${t('land_sub')}</p>
       <div class="hero-cta">
         <a class="btn primary big" href="#/login/register">${t('land_join')}</a>

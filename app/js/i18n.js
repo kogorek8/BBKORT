@@ -801,8 +801,10 @@ const pl = {
   file_import_bad: "Nie udało się odczytać pliku",
   file_import_none: "Nie znaleziono żadnych współrzędnych",
   land_title: "OG SPOT",
-  land_tag: "BRINGING PLAYERS TOGETHER",
+  
   land_sub: "Mapa boisk sportowych, na której widać, kto teraz gra i do jakiej gry możesz dołączyć. Załóż profil i drużynę, wyzywaj inne ekipy o boiska i zbieraj OG Coins na nagrody.",
+  land_tag: "SPRAWDZONE MIEJSCA DO GRY",
+  land_tag2: "Bringing players together",
 };
 
 const en = {
@@ -1601,8 +1603,10 @@ const en = {
   file_import_bad: "Could not read the file",
   file_import_none: "No coordinates found",
   land_title: "OG SPOT",
-  land_tag: "BRINGING PLAYERS TOGETHER",
+  
   land_sub: "A map of sports courts that shows who's playing right now and which games you can join. Create a profile and a team, challenge other crews for courts and collect OG Coins for rewards.",
+  land_tag: "TESTED PLACES TO PLAY",
+  land_tag2: "Bringing players together",
 };
 
 const DICT = { pl, en };
