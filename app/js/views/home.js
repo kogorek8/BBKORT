@@ -208,8 +208,8 @@ function landing(root) {
   root.innerHTML = `
     <section class="hero">
       ${heroArt()}
-      <div class="brand big">BB<span>KORT</span></div>
-      <h1>${t('land_title')}</h1>
+      <h1 class="hero-title">OG <span>SPOT</span></h1>
+      <div class="hero-tag">${t('land_tag')}</div>
       <p>${t('land_sub')}</p>
       <div class="hero-cta">
         <a class="btn primary big" href="#/login/register">${t('land_join')}</a>

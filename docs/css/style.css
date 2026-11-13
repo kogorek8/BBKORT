@@ -647,3 +647,8 @@ textarea { width: 100%; background: var(--bg2); border: 1px solid var(--line); c
 .hero-nums { gap: 16px; flex-wrap: wrap; }
 .tiles { grid-template-columns: repeat(3, 1fr); }
 .review input, .review textarea, .review select { margin: 3px 0; }
+
+/* ekran dla gości: OG SPOT */
+.hero .hero-title { font-size: 3.4rem; font-weight: 900; font-style: italic; letter-spacing: .01em; line-height: 1; margin: 6px 0 8px; }
+.hero .hero-title span { color: var(--accent); }
+.hero-tag { font-size: .82rem; font-weight: 800; letter-spacing: .22em; color: var(--accent2); text-transform: uppercase; }

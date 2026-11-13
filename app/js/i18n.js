@@ -459,8 +459,8 @@ const pl = {
   ok_invited: "Zaproszenie wysłane",
   err_not_allowed: "Nie możesz tego zrobić",
   err_player_in_team: "Ten gracz ma już drużynę",
-  land_title: "Znajdź boisko. Znajdź ekipę. Graj.",
-  land_sub: "Mapa boisk sprawdzonych w grze, otwarte gry, do których możesz dołączyć, oraz drużyny, tabela i walka o boiska – jak w grze terenowej.",
+  
+  
   land_games: "otwartych gier",
   land_games_title: "Najbliższe gry – dołącz",
   how_intro: "BBKORT pokazuje, gdzie i z kim pograć, a drużynom daje prawdziwą rywalizację o boiska.",
@@ -800,6 +800,9 @@ const pl = {
   file_import_go: "Importuj",
   file_import_bad: "Nie udało się odczytać pliku",
   file_import_none: "Nie znaleziono żadnych współrzędnych",
+  land_title: "OG SPOT",
+  land_tag: "BRINGING PLAYERS TOGETHER",
+  land_sub: "Mapa boisk do koszykówki i piłki nożnej, na której widać, kto teraz gra i do jakiej gry możesz dołączyć. Załóż profil i drużynę, wyzywaj inne ekipy o boiska i zbieraj OG Coins na nagrody.",
 };
 
 const en = {
@@ -1256,8 +1259,8 @@ const en = {
   ok_invited: "Invitation sent",
   err_not_allowed: "You can't do that",
   err_player_in_team: "This player already has a team",
-  land_title: "Find a court. Find a crew. Play.",
-  land_sub: "A map of courts tested in play, open games you can join, plus teams, a table and battles for courts – like a real-world game.",
+  
+  
   land_games: "open games",
   land_games_title: "Upcoming games – join in",
   how_intro: "BBKORT shows where and with whom to play, and gives teams real competition for courts.",
@@ -1597,6 +1600,9 @@ const en = {
   file_import_go: "Import",
   file_import_bad: "Could not read the file",
   file_import_none: "No coordinates found",
+  land_title: "OG SPOT",
+  land_tag: "BRINGING PLAYERS TOGETHER",
+  land_sub: "A map of basketball and football courts that shows who's playing right now and which games you can join. Create a profile and a team, challenge other crews for courts and collect OG Coins for rewards.",
 };
 
 const DICT = { pl, en };
