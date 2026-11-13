@@ -10,4 +10,9 @@ VERSION="$(date -u +%Y%m%d-%H%M)"
   --minify --legal-comments=none --define:__BB_VERSION__="\"$VERSION\"" --outfile=app/app.js --log-level=warning
 # wersja w adresach plików → przeglądarka pobiera świeże po każdej aktualizacji
 sed -i -E "s|app\.js\?v=[^\"]*|app.js?v=$VERSION|; s|css/style\.css\?v=[^\"]*|css/style.css?v=$VERSION|; s|data-version=\"[^\"]*\"|data-version=\"$VERSION\"|" app/index.html
+# kopia gotowej aplikacji dla GitHub Pages (Settings → Pages → gałąź + folder /docs)
+mkdir -p docs
+rm -rf docs/css docs/img
+cp -r app/index.html app/app.js app/css app/img app/manifest.webmanifest app/sw.js docs/
+touch docs/.nojekyll
 echo "Zbudowano app/app.js  (wersja $VERSION, $(wc -c < app/app.js) bajtów)"

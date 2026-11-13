@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BBKORT – King of the Court</title>
+  <meta name="description" content="BBKORT – mapa boisk do koszykówki, drużyny i walka o tytuł King of the Court.">
+  <meta name="theme-color" content="#0d0f14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/icon.svg">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="css/style.css?v=20261113-0320">
+</head>
+<body data-version="20261113-0320">
+  <header class="topbar">
+    <a class="brand" href="#/home">BB<span>KORT</span></a>
+    <div class="top-actions">
+      <button id="lang-btn" class="btn small ghost">EN</button>
+      <span id="user-chip"></span>
+    </div>
+  </header>
+  <div id="demo-bar" hidden></div>
+
+  <main>
+    <section id="map-view" hidden>
+      <div id="map"></div>
+      <div id="map-top" class="map-top"></div>
+      <div id="map-controls" class="map-controls"></div>
+      <div id="court-sheet" class="sheet" hidden></div>
+    </section>
+    <section id="page"><div class="loading"><div class="brand big">BB<span>KORT</span></div><div class="loading-ball">🏀</div></div></section>
+  </main>
+
+  <nav class="bottom-nav" id="nav"></nav>
+  <div id="toast"></div>
+  <div id="modal-root"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    // Gdy aplikacja się nie uruchomi (stara wersja w pamięci, brak sieci) – pokaż komunikat zamiast wiecznego logo
+    window.__bbBooted = false;
+    function bbFail(msg) {
+      var p = document.getElementById('page');
+      if (window.__bbBooted || !p || p.dataset.failed) return;
+      p.dataset.failed = '1'; p.hidden = false;
+      p.innerHTML = '<div class="loading"><div class="brand big">BB<span>KORT</span></div>'
+        + '<p><b>Nie udało się załadować aplikacji.</b></p><p class="muted small">' + String(msg).replace(/</g, '&lt;') + '</p>'
+        + '<button class="btn primary big" onclick="bbReload()">Odśwież</button>'
+        + '<p class="muted small">wersja ' + document.body.dataset.version + '</p></div>';
+    }
+    function bbReload() { var u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); }
+    window.addEventListener('error', function (e) {
+      var t = e.target; if (t && t.tagName === 'IMG') return;
+      bbFail(e.message || ('Nie wczytano pliku: ' + ((t && (t.src || t.href)) || '?')));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) { bbFail((e.reason && e.reason.message) || e.reason); });
+    setTimeout(function () { bbFail('Aplikacja ładuje się zbyt długo – słabe połączenie albo stara wersja w pamięci przeglądarki.'); }, 20000);
+  </script>
+  <script type="module" src="app.js?v=20261113-0320"></script>
+</body>
+</html>
