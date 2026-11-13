@@ -2,7 +2,7 @@
 import { api } from './api/index.js';
 import { t, has } from './i18n.js';
 import { toast } from './ui.js';
-import { OPEN_STATUSES, WIN_STATUSES, ZONE_LAT, ZONE_LNG, COURT_CRITERIA } from './rules.js';
+import { OPEN_STATUSES, WIN_STATUSES, ZONE_LAT, ZONE_LNG, COURT_CRITERIA, RULES, BADGES, SEASON_POINTS, STAT_KEYS, seasonAt, H } from './rules.js';
 import { teamRating } from './skills.js';
 
 export const store = { data: null, me: null };
@@ -18,7 +18,8 @@ export async function reload() {
     try { await api.rpc('resolve_expired', {}); } catch { /* ignore */ }
   }
   const d = await api.load();
-  for (const k of ['court_ratings', 'court_reviews', 'team_requests', 'games', 'game_players', 'court_issues']) d[k] = d[k] || [];
+  for (const k of ['court_ratings', 'court_reviews', 'team_requests', 'games', 'game_players', 'court_issues', 'court_presence', 'notifications',
+    'challenge_backers', 'match_stats', 'player_badges', 'posts', 'shop_items', 'drops', 'purchases', 'coin_ledger']) d[k] = d[k] || [];
   // boiska zgłoszone przez graczy czekają na akceptację – nie są jeszcze na mapie
   d.pending_courts = d.courts.filter((c) => c.status === 'pending');
   d.courts = d.courts.filter((c) => c.status !== 'pending');
@@ -174,3 +175,103 @@ export const myGames = () => (store.me ? upcomingGames().filter((g) => gamePlaye
 export const openIssues = (cid) => store.data.court_issues.filter((i) => i.status === 'open' && (!cid || i.court_id === cid));
 export const teamRequests = (tid) => store.data.team_requests.filter((r) => r.team_id === tid);
 export const myTeamRequests = () => (store.me ? store.data.team_requests.filter((r) => r.player_id === store.me.id) : []);
+
+// ---- KTO TERAZ GRA
+export const presentNow = (cid) => store.data.court_presence
+  .filter((x) => (!cid || x.court_id === cid) && T(x.at) > now() - RULES.PRESENCE_HOURS * H)
+  .sort((a, b) => T(b.at) - T(a.at));
+export const iAmPresent = (cid) => !!(store.me && presentNow(cid).some((x) => x.player_id === store.me.id));
+
+// ---- powiadomienia, portfel
+export const unreadCount = () => store.data.notifications.filter((n) => !n.read).length;
+export const todayKey = () => { const d = new Date(now()); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+export const hasLedgerKey = (key) => store.data.coin_ledger.some((l) => l.key === key);
+export function streakDays() {
+  let n = 0;
+  const day = (i) => { const d = new Date(now() - i * 24 * H); const p = (x) => String(x).padStart(2, '0'); return `daily:checkin:${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+  let i = hasLedgerKey(day(0)) ? 0 : 1;
+  while (hasLedgerKey(day(i))) { n++; i++; }
+  return n;
+}
+
+// ---- statystyki zawodnika z zatwierdzonych meczów
+export function playerTotals(pid) {
+  const rows = store.data.match_stats.filter((m) => m.player_id === pid && m.status === 'approved');
+  const sum = {};
+  let best = 0;
+  for (const r of rows) for (const [k, v] of Object.entries(r.stats || {})) {
+    sum[k] = (sum[k] || 0) + Number(v || 0);
+    if (k === 'pts' || k === 'goals') best = Math.max(best, Number(v || 0));
+  }
+  return { n: rows.length, sum, best };
+}
+export function playerRecord(pid) {
+  const played = store.data.challenge_players.filter((x) => x.player_id === pid && x.checked_in_at);
+  let w = 0;
+  for (const x of played) {
+    const c = store.data.challenges.find((ch) => ch.id === x.challenge_id);
+    if (c && WIN_STATUSES.includes(c.status) && c.winner_team_id === x.team_id) w++;
+  }
+  return { played: played.length, w, pct: played.length ? Math.round((100 * w) / played.length) : null };
+}
+
+// ---- ODZNAKI: wartości liczone z danych gry
+export function badgeMetrics(p) {
+  const d = store.data;
+  const rec = playerRecord(p.id);
+  const tid = p.team_id;
+  const hist = tid ? d.court_history.filter((h) => h.team_id === tid) : [];
+  return {
+    checkins: p.checkins || 0,
+    wins: rec.w,
+    played: rec.played,
+    defenses: hist.filter((h) => h.event === 'defend').length,
+    captures: hist.filter((h) => h.event === 'capture').length,
+    best: playerTotals(p.id).best,
+    games: d.games.filter((g) => g.host_id === p.id && g.status === 'open' && T(g.starts_at) < now()).length,
+    opinions: d.court_ratings.filter((r) => r.player_id === p.id).length,
+    referrals: d.profiles.filter((x) => x.invited_by === p.id).length,
+    drops: d.drops.filter((x) => x.claimed_by === p.id).length,
+  };
+}
+export function badgesOf(p) {
+  const m = badgeMetrics(p);
+  return BADGES.map((b) => {
+    const v = m[b.metric] || 0;
+    const tier = b.tiers.filter((t) => v >= t).length;          // 0 = jeszcze nie zdobyta
+    return { ...b, value: v, tier, next: b.tiers[tier] ?? null };
+  });
+}
+export const specialBadges = (pid) => store.data.player_badges.filter((b) => b.player_id === pid);
+
+// ---- SEZON: punkty drużyn w bieżącym sezonie
+export function seasonStandings(sport, at = now()) {
+  const se = seasonAt(at);
+  const inSeason = (t) => T(t) >= se.start && T(t) < se.end;
+  const rows = store.data.teams.filter((tm) => tm.sport === sport).map((tm) => {
+    const wins = store.data.challenges.filter((c) => WIN_STATUSES.includes(c.status) && c.winner_team_id === tm.id && inSeason(c.resolved_at)).length;
+    const h = store.data.court_history.filter((x) => x.team_id === tm.id && inSeason(x.at));
+    const cnt = (e) => h.filter((x) => x.event === e).length;
+    const pts = wins * SEASON_POINTS.win + cnt('capture') * SEASON_POINTS.capture + cnt('defend') * SEASON_POINTS.defend + cnt('claim') * SEASON_POINTS.claim;
+    return { team: tm, pts, wins, captures: cnt('capture'), defends: cnt('defend'), claims: cnt('claim') };
+  });
+  rows.sort((a, b) => b.pts - a.pts || b.wins - a.wins || a.team.name.localeCompare(b.team.name));
+  rows.forEach((r, i) => (r.pos = i + 1));
+  return { season: se, rows };
+}
+// królowie strzelców sezonu (z zatwierdzonych statystyk)
+export function seasonScorers(sport, at = now()) {
+  const se = seasonAt(at);
+  const key = STAT_KEYS[sport][0];
+  const by = {};
+  for (const m of store.data.match_stats) {
+    if (m.status !== 'approved') continue;
+    const c = store.data.challenges.find((x) => x.id === m.challenge_id);
+    const p = profileById(m.player_id);
+    if (!c || !p || p.sport !== sport || !(T(c.scheduled_at) >= se.start && T(c.scheduled_at) < se.end)) continue;
+    by[p.id] = by[p.id] || { p, total: 0, n: 0 };
+    by[p.id].total += Number(m.stats?.[key] || 0); by[p.id].n++;
+  }
+  return Object.values(by).sort((a, b) => b.total - a.total).slice(0, 5);
+}
+export const backers = (chid) => store.data.challenge_backers.filter((b) => b.challenge_id === chid);

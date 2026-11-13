@@ -7,15 +7,22 @@ export async function create(cfg) {
   let changeCb = null;
   sb.auth.onAuthStateChange((_e, s) => { session = s; changeCb && changeCb(); });
 
-  // pobiera całą tabelę partiami po 1000 wierszy (limit Supabase)
-  async function all(table, optional = false) {
+  // pobiera całą tabelę partiami po 1000 wierszy (limit Supabase); mod = dodatkowy filtr
+  async function all(table, optional = false, mod = null) {
     const out = [];
     for (let from = 0; ; from += 1000) {
-      const { data, error } = await sb.from(table).select('*').range(from, from + 999);
+      let q = sb.from(table).select('*');
+      if (mod) q = mod(q);
+      const { data, error } = await q.range(from, from + 999);
       if (error) { if (optional) return out; throw new Error(error.message); }
       out.push(...data);
       if (data.length < 1000) return out;
     }
+  }
+  // jedna strona wyników (np. ostatnie powiadomienia)
+  async function page(table, mod) {
+    const { data, error } = await mod(sb.from(table).select('*'));
+    return error ? [] : data;
   }
 
   return {
@@ -23,15 +30,19 @@ export async function create(cfg) {
     now: () => Date.now(),
     canImport: () => !!session,
     async load() {
-      // tabele z migracji 2 i 3 są opcjonalne – ich brak nie psuje aplikacji
-      const [teams, profiles, courts, challenges, challenge_players, court_history,
-        court_ratings, court_reviews, team_requests, games, game_players, court_issues] = await Promise.all([
+      // tabele z migracji 2–4 są opcjonalne – ich brak nie psuje aplikacji
+      const recent = new Date(Date.now() - 3 * 3600e3).toISOString();
+      const names = ['court_ratings', 'court_reviews', 'team_requests', 'games', 'game_players', 'court_issues',
+        'challenge_backers', 'match_stats', 'player_badges', 'posts', 'shop_items', 'drops', 'purchases', 'coin_ledger'];
+      const [teams, profiles, courts, challenges, challenge_players, court_history, court_presence, notifications, ...opt] = await Promise.all([
         all('teams'), all('profiles'), all('courts'), all('challenges'), all('challenge_players'), all('court_history'),
-        all('court_ratings', true), all('court_reviews', true), all('team_requests', true),
-        all('games', true), all('game_players', true), all('court_issues', true),
+        all('court_presence', true, (q) => q.gte('at', recent)),
+        session ? page('notifications', (q) => q.order('created_at', { ascending: false }).limit(40)) : [],
+        ...names.map((n) => all(n, true)),
       ]);
-      return { teams, profiles, courts, challenges, challenge_players, court_history,
-        court_ratings, court_reviews, team_requests, games, game_players, court_issues };
+      const d = { teams, profiles, courts, challenges, challenge_players, court_history, court_presence, notifications };
+      names.forEach((n, i) => (d[n] = opt[i]));
+      return d;
     },
     async me(data) {
       if (!session) return null;

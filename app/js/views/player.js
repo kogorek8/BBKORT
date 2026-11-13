@@ -1,41 +1,23 @@
-// Karta zawodnika w stylu gier sportowych + edycja skilli (do akceptacji admina/moderatora)
+// Karta zawodnika jak w grze: OVR, 6 pasków, poziom, odznaki, statystyki z meczów
 import { t } from '../i18n.js';
-import { RULES, SPORTS, SPORT_ICON } from '../rules.js';
-import { skillGroups, skillKeys, POSITIONS, ovr, tier, groupAvg, defaultSkills, skillsOf } from '../skills.js';
-import { esc, bind, modal, teamTag, fmtDate } from '../ui.js';
-import { store, act, teamById, profileById } from '../state.js';
+import { RULES, SPORTS, SPORT_ICON, STAT_KEYS, SPECIAL_BADGES, levelOf } from '../rules.js';
+import { skillGroups, skillKeys, POSITIONS, ovr, tier, defaultSkills, skillsOf } from '../skills.js';
+import { esc, bind, modal, teamTag } from '../ui.js';
+import { store, act, teamById, profileById, isStaff, isAdmin, playerTotals, playerRecord, badgesOf, specialBadges } from '../state.js';
+import { jersey } from './home.js';
+import { badgeChip, specialChip } from './season.js';
+import { coins, levelBar } from './shop.js';
 
-const viewPending = {};   // playerId -> bool
+const viewPending = {};
 
 export function skillBars(values, compare, sport) {
-  return skillGroups(sport).map((g) => {
-    const ga = groupAvg(values, g);
-    return `<div class="sgroup">
-      <div class="sgroup-head"><span>${t(g.key)}</span><b class="${tier(ga)}">${ga ?? '—'}</b></div>
-      ${g.items.map((k) => {
-        const v = values ? values[k] : null;
-        const old = compare ? compare[k] : null;
-        const diff = compare && v != null && old != null ? v - old : 0;
-        return `<div class="sbar">
-          <span class="sbar-label">${t('sk_' + k)}</span>
-          <div class="sbar-track"><div class="sbar-fill ${tier(v)}" style="width:${v ? ((v - 25) / 74) * 100 : 0}%"></div></div>
-          <span class="sbar-val ${tier(v)}">${v ?? '—'}</span>
-          ${diff ? `<span class="diff ${diff > 0 ? 'up' : 'down'}">${diff > 0 ? '▲' : '▼'}${Math.abs(diff)}</span>` : '<span class="diff"></span>'}
-        </div>`;
-      }).join('')}
-    </div>`;
-  }).join('');
-}
-
-// mini-statystyki zawodnika z meczów jego drużyny
-function playerStats(p) {
-  const played = store.data.challenge_players.filter((x) => x.player_id === p.id && x.checked_in_at);
-  let w = 0;
-  for (const x of played) {
-    const c = store.data.challenges.find((ch) => ch.id === x.challenge_id);
-    if (c && c.winner_team_id === x.team_id) w++;
-  }
-  return { played: played.length, w };
+  return `<div class="bars6">${skillKeys(sport).map((k) => {
+    const v = values ? values[k] : null;
+    const old = compare ? compare[k] : null;
+    const diff = compare && v != null && old != null ? v - old : 0;
+    return `<div class="bar6"><div class="bar6-top"><span>${t('sk_' + k)}</span><b class="${tier(v)}">${v ?? '—'}${diff ? `<i class="diff ${diff > 0 ? 'up' : 'down'}">${diff > 0 ? '▲' : '▼'}${Math.abs(diff)}</i>` : ''}</b></div>
+      <div class="sbar-track"><div class="sbar-fill ${tier(v)}" style="width:${v ? ((v - 25) / 74) * 100 : 0}%"></div></div></div>`;
+  }).join('')}</div>`;
 }
 
 export function renderPlayer(root, id) {
@@ -52,14 +34,20 @@ export function renderPlayer(root, id) {
   const pending = p.skills_status === 'pending' && p.skills_pending && p.skills_pending_sport === sport ? p.skills_pending : null;
   const showPending = !!pending && (viewPending[p.id] ?? !approved);
   const shown = showPending ? pending : approved;
-  const o = ovr(shown, sport, p.position);
+  const o = ovr(shown, sport);
   const color = tm ? tm.color : '#ff7a1a';
-  const st = playerStats(p);
+  const rec = playerRecord(p.id);
+  const tot = playerTotals(p.id);
+  const lv = levelOf(p.xp);
+  const badges = badgesOf(p);
+  const earned = badges.filter((b) => b.tier > 0).sort((a, b) => b.tier - a.tier);
+  const special = specialBadges(p.id);
+  const per = (k) => (tot.n ? (Number(tot.sum[k] || 0) / tot.n).toFixed(1) : '—');
   const roles = [p.is_admin ? '🛠️ Admin' : '', p.is_moderator ? `🧑‍⚖️ ${t('moderator')}` : ''].filter(Boolean);
 
   root.innerHTML = `
     ${tm ? `<a class="back" href="#/team/${esc(tm.id)}">← ${esc(tm.name)}</a>` : `<a class="back" href="#/teams">← ${t('nav_teams')}</a>`}
-    <div class="pcard ${showPending ? 'is-pending' : ''} sport-${sport}" style="--c:${esc(color)}">
+    <div class="pcard f-${esc(p.frame || 'none')} ${showPending ? 'is-pending' : ''} sport-${sport}" style="--c:${esc(color)}">
       ${pending ? `<div class="pending-ribbon">⏳ ${t('skills_pending')}</div>` : ''}
       <div class="pcard-top">
         <div class="pcard-ovr ${tier(o)}"><b>${o ?? '—'}</b><span>OVR</span></div>
@@ -67,59 +55,81 @@ export function renderPlayer(root, id) {
           <div class="pcard-pos">${SPORT_ICON[sport]} ${esc(p.position || '—')}${p.number != null ? ` <span>#${p.number}</span>` : ''}</div>
           <h1>${esc(p.nick)}</h1>
           <div class="small">${tm ? teamTag(tm) + ' ' + esc(tm.name) : `<span class="muted">${t('free_agent')}</span>`}
-            ${tm && tm.captain_id === p.id ? ` · <span class="badge cap">C</span> ${t('captain')}` : ''}</div>
-          <div class="small muted">${p.height_cm ? p.height_cm + ' cm' : ''}${roles.length ? ' · ' + roles.join(' · ') : ''}</div>
+            ${tm && tm.captain_id === p.id ? ` · <span class="badge cap">C</span>` : ''}</div>
+          <div class="small muted">LVL ${lv.lvl} · ${t(lv.title)}${p.height_cm ? ' · ' + p.height_cm + ' cm' : ''}${roles.length ? ' · ' + roles.join(' · ') : ''}</div>
         </div>
+        ${jersey(p, tm, 58)}
       </div>
-      <div class="pstats">
-        <div><b>${st.played}</b><span>${t('matches_played')}</span></div>
-        <div><b>${st.w}</b><span>${t('wins')}</span></div>
+      ${own ? `<div class="pcard-wallet"><a href="#/shop">${coins(p.coins || 0)} OG Coins ›</a></div>${levelBar(p)}` : ''}
+      <div class="pstats four">
+        <div><b>${rec.played}</b><span>${t('matches_played')}</span></div>
+        <div><b>${rec.w}</b><span>${t('wins')}</span></div>
+        <div><b>${p.checkins || 0}</b><span>📍 ${t('checkins')}</span></div>
         <div><b>${p.ghost_count}</b><span>👻 ${t('ghost')}</span></div>
-      </div>
-      <div class="pcard-badges">
-        ${p.skills_status === 'approved' && approved ? `<span class="pill ok">✔ ${t('skills_approved')}</span>` : ''}
-        ${p.skills_status === 'rejected' ? `<span class="pill err">✖ ${t('skills_rejected')}${p.skills_note ? ': ' + esc(p.skills_note) : ''}</span>` : ''}
-        ${!approved && !pending ? `<span class="pill">${t('skills_none')}</span>` : ''}
       </div>
       ${pending ? `<div class="seg wide">
           <button data-act="view" data-v="0" class="${showPending ? '' : 'on'}" ${approved ? '' : 'disabled'}>✔ ${t('approved_values')}</button>
-          <button data-act="view" data-v="1" class="${showPending ? 'on' : ''}">⏳ ${t('pending_values')}</button></div>
-        ${showPending ? `<div class="small muted center">${t('pending_explain')} · ${fmtDate(p.skills_submitted_at)}</div>` : ''}` : ''}
-      <div class="skills">${shown ? skillBars(shown, showPending ? approved : null, sport) : `<p class="muted center">${t('no_skills_yet')}</p>`}</div>
+          <button data-act="view" data-v="1" class="${showPending ? 'on' : ''}">⏳ ${t('pending_values')}</button></div>` : ''}
+      ${shown ? skillBars(shown, showPending ? approved : null, sport) : `<p class="muted center">${t('no_skills_yet2')}</p>`}
+      ${tot.n ? `<div class="avgs"><div class="small muted">${t('avg_title', { n: tot.n })}</div><div class="avg-row">${STAT_KEYS[sport].map((k) => `<div><b>${per(k)}</b><span>${t('st_' + k)}</span></div>`).join('')}</div></div>` : ''}
+      ${earned.length || special.length ? `<div class="badges-wrap">${special.map(specialChip).join('')}${earned.map((b) => badgeChip(b)).join('')}</div>` : `<p class="small muted center">${t('no_badges')}</p>`}
       ${p.skills_video ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${esc(p.skills_video)}">🎬 ${t('video')}</a>` : ''}
     </div>
-    ${own ? `<div class="row"><button class="btn primary" data-act="edit-skills">✏️ ${t('edit_skills')}</button>
-      <button class="btn" data-act="edit-profile">${t('edit_profile')}</button></div>` : ''}`;
+    <div class="row">
+      ${own ? `<button class="btn" data-act="edit-profile">✏️ ${t('edit_profile')}</button><button class="btn ghost" data-act="edit-skills">${t('propose_skills')}</button>
+        <a class="btn ghost" href="#/season">🏅 ${t('badges_title')}</a>` : ''}
+      ${isStaff() ? `<button class="btn staff primary" data-act="set-skills">🎚️ ${t('set_skills')}</button>` : ''}
+      ${isAdmin() ? `<button class="btn staff" data-act="badge">🌟 ${t('grant_badge')}</button>` : ''}
+    </div>
+    ${own ? `<p class="small muted">${t('skills_admin_note')}</p>` : ''}`;
 
   bind(root, {
     view: (d) => { viewPending[p.id] = d.v === '1'; renderPlayer(root, p.id); },
-    'edit-skills': () => openSkillEditor(p, sport),
+    'edit-skills': () => openSkillEditor(p, sport, false),
+    'set-skills': () => openSkillEditor(p, sport, true),
     'edit-profile': () => openProfileEditor(p, tm),
+    badge: () => openBadgeGrant(p),
   });
 }
 
-function openSkillEditor(p, sport) {
+// suwaki skilli: zawodnik = propozycja do akceptacji; admin/sędzia = ustawia od razu
+export function openSkillEditor(p, sport, asStaff) {
   const vals = { ...defaultSkills(sport), ...(skillsOf(p, sport) || {}), ...(p.skills_pending_sport === sport ? p.skills_pending || {} : {}) };
-  modal(`<h3>✏️ ${t('edit_skills')} · ${SPORT_ICON[sport]} ${t('sport_' + sport)}</h3>
-    <p class="small muted">${t('skills_editor_hint')}</p>
-    <div class="ovr-live">OVR <b id="ovrl">${ovr(vals, sport, p.position)}</b></div>
-    <div class="editor">${skillGroups(sport).map((g) => `<div class="sgroup"><div class="sgroup-head"><span>${t(g.key)}</span></div>
-      ${g.items.map((k) => `<label class="slider"><span>${t('sk_' + k)}</span>
+  modal(`<h3>🎚️ ${asStaff ? t('set_skills') : t('propose_skills')} · ${esc(p.nick)}</h3>
+    <p class="small muted">${asStaff ? t('set_skills_hint') : t('skills_editor_hint2')}</p>
+    <div class="ovr-live">OVR <b id="ovrl">${ovr(vals, sport)}</b></div>
+    <div class="editor">${skillGroups(sport).map((g) => g.items.map((k) => `<label class="slider"><span>${t('sk_' + k)}</span>
         <input type="range" min="${RULES.MIN_SKILL}" max="${RULES.MAX_SKILL}" value="${vals[k]}" data-k="${k}">
-        <b class="${tier(vals[k])}" id="v-${k}">${vals[k]}</b></label>`).join('')}</div>`).join('')}</div>
-    <label>${t('video_link')}<input id="vid" type="url" placeholder="https://youtube.com/..." value="${esc(p.skills_video || '')}"></label>
+        <b class="${tier(vals[k])}" id="v-${k}">${vals[k]}</b></label>`).join('')).join('')}</div>
+    ${asStaff ? '' : `<label>${t('video_link')}<input id="vid" type="url" placeholder="https://youtube.com/..." value="${esc(p.skills_video || '')}"></label>`}
     <div class="row end"><button class="btn ghost" data-close>${t('cancel')}</button>
-    <button class="btn primary" id="send">${t('send_for_review')}</button></div>`, (m, close) => {
+    <button class="btn primary" id="send">${asStaff ? t('save') : t('send_for_review')}</button></div>`, (m, close) => {
     m.querySelectorAll('input[type=range]').forEach((r) => (r.oninput = () => {
       vals[r.dataset.k] = Number(r.value);
       const b = m.querySelector('#v-' + r.dataset.k);
       b.textContent = r.value; b.className = tier(Number(r.value));
-      m.querySelector('#ovrl').textContent = ovr(vals, sport, p.position);
+      m.querySelector('#ovrl').textContent = ovr(vals, sport);
     }));
     m.querySelector('#send').onclick = async () => {
       const skills = Object.fromEntries(skillKeys(sport).map((k) => [k, vals[k]]));
-      if (await act('submit_skills', { p_sport: sport, p_skills: skills, p_video: m.querySelector('#vid').value }, 'ok_skills_sent')) close();
+      const ok = asStaff
+        ? await act('admin_set_skills', { p_player: p.id, p_sport: sport, p_skills: skills }, 'ok_saved')
+        : await act('submit_skills', { p_sport: sport, p_skills: skills, p_video: m.querySelector('#vid').value }, 'ok_skills_sent');
+      if (ok) close();
     };
+  });
+}
+
+function openBadgeGrant(p) {
+  const has = specialBadges(p.id).map((b) => b.code);
+  modal(`<h3>🌟 ${t('grant_badge')} · ${esc(p.nick)}</h3>
+    <label>${t('badge_note')}<input id="bn" maxlength="80" placeholder="${t('badge_note_ph')}"></label>
+    <div class="ulist">${SPECIAL_BADGES.map((c) => `<button class="uitem ${has.includes(c) ? 'on' : ''}" data-c="${c}"><b>${t('sb_' + c)}</b> <span class="small muted">${t('sb_' + c + '_d')}${has.includes(c) ? ' · ✓' : ''}</span></button>`).join('')}</div>`,
+  (m, close) => {
+    m.querySelectorAll('[data-c]').forEach((b) => (b.onclick = async () => {
+      const on = !has.includes(b.dataset.c);
+      if (await act('grant_badge', { p_player: p.id, p_code: b.dataset.c, p_note: m.querySelector('#bn').value, p_on: on }, 'ok_saved')) close();
+    }));
   });
 }
 

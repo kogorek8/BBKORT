@@ -1,7 +1,7 @@
 {
   "name": "BBKORT – King of the Court",
   "short_name": "BBKORT",
-  "start_url": "./index.html#/map",
+  "start_url": "./index.html#/home",
   "display": "standalone",
   "background_color": "#0d0f14",
   "theme_color": "#0d0f14",

@@ -1,11 +1,11 @@
 // TABLICA WYZWAŃ (publiczna): wyzwania, check-in, zgłoszenia wyników, sędziowanie
 import { t } from '../i18n.js';
-import { RULES, OPEN_STATUSES, SPORTS, SPORT_ICON, M } from '../rules.js';
+import { RULES, OPEN_STATUSES, SPORTS, SPORT_ICON, STAT_KEYS, M } from '../rules.js';
 import { currentPos } from '../geo.js';
 import { esc, bind, modal, toast, teamTag, fmtDate, fmtLeft, confirmBox } from '../ui.js';
 import {
   store, act, now, T, teamById, profileById, courtById, courtName, signups, isCaptainOf, myTeam, isStaff,
-  ui, setSport, sportOk, challengeSport,
+  ui, setSport, sportOk, challengeSport, backers,
 } from '../state.js';
 
 const reportOf = (c, side) => (side === 'c' ? c.challenger_report : c.defender_report);
@@ -25,7 +25,26 @@ export function actionsFor(c) {
     if (c.status !== 'pending') out.push({ act: 'referee', label: '✅ ' + t('referee_result'), cls: 'primary', urgent: c.status === 'reported', staff: true });
   }
 
+  // admin / sędzia: akceptacja zgłoszeń (wyzwanie lub przejęcie)
+  if (isStaff() && ['review', 'proposed'].includes(c.status)) {
+    out.push({ act: 'rv-yes', label: '✔ ' + t('approve'), cls: 'primary', urgent: c.status === 'review', staff: true },
+      { act: 'rv-no', label: '✖ ' + t('reject'), cls: 'ghost danger', staff: true });
+  }
   if (!me.team_id) return out;
+  // zgłoszenie czeka na poparcie drużyny / akceptację admina
+  if (['proposed', 'review'].includes(c.status)) {
+    if (me.team_id !== c.challenger_team_id) return out;
+    const mineBack = backers(c.id).some((b) => b.player_id === me.id);
+    if (c.status === 'proposed' && !mineBack) out.push({ act: 'support', label: '✋ ' + t('support'), cls: 'primary', urgent: true });
+    if (c.created_by === me.id || isCaptainOf(me.team_id)) out.push({ act: 'cancel', label: t('withdraw'), cls: 'ghost' });
+    return out;
+  }
+  // statystyki po meczu: każdy zawodnik zgłasza swoje, admin zatwierdza
+  if (c.kind !== 'claim' && ['reported', 'confirmed'].includes(c.status) && [c.challenger_team_id, c.defender_team_id].includes(me.team_id)) {
+    const ms = store.data.match_stats.find((m) => m.challenge_id === c.id && m.player_id === me.id);
+    if (!ms || ms.status !== 'approved') out.push({ act: 'stats', label: '📊 ' + (ms ? t('stats_change') : t('stats_send')), cls: ms ? 'ghost' : '', urgent: !ms && c.status === 'confirmed' && T(c.resolved_at) > n - 72 * 3600e3 });
+  }
+  if (!OPEN_STATUSES.includes(c.status)) return out;
   const side = me.team_id === c.challenger_team_id ? 'c' : me.team_id === c.defender_team_id ? 'd' : null;
   if (!side) return out;
   const cap = isCaptainOf(me.team_id);
@@ -67,6 +86,10 @@ function statusLine(c) {
   const n = now();
   const start = T(c.scheduled_at);
   switch (c.status) {
+    case 'proposed': return `✋ ${t('st_proposed', { n: backers(c.id).length, m: RULES.BACKERS })} · ${t('time_left')} <b>${fmtLeft(T(c.created_at) + 48 * 3600e3 - n)}</b>`;
+    case 'review': return `🧑‍⚖️ ${t('st_review')}`;
+    case 'rejected': return `✖ ${t('st_rejected')}${c.note ? ': ' + esc(c.note) : ''}`;
+    case 'claimed': return `👑 ${t('st_claimed')}`;
     case 'pending': return `⏳ ${t('st_pending')} · ${t('time_left')} <b>${fmtLeft(T(c.accept_deadline) - n)}</b>`;
     case 'accepted':
       if (n < start - RULES.CHECKIN_BEFORE_MIN * M) return `✅ ${t('st_accepted')} · ${t('starts_in')} ${fmtLeft(start - n)}`;
@@ -122,6 +145,16 @@ export function challengeCard(c, compact = false) {
   const sp = challengeSport(c);
   const score = c.score_challenger != null ? `<div class="score">${c.score_challenger} : ${c.score_defender}</div>` : '<div class="vs">VS</div>';
   const acts = compact ? [] : actionsFor(c);
+  const myStat = store.me ? store.data.match_stats.find((m) => m.challenge_id === c.id && m.player_id === store.me.id) : null;
+  if (c.kind === 'claim') {
+    const tm = teamById(c.challenger_team_id);
+    return `<div class="mcard st-${c.status} claim">
+      <div class="mcard-head"><a href="#/map/${esc(c.court_id)}">${SPORT_ICON[sp] || ''} ${esc(courtName(court))}</a><span class="pill">👑 ${t('claim_request')}</span></div>
+      <div class="small">${teamTag(tm)} <b>${esc(tm?.name || '?')}</b> ${t('claim_wants')} · ${t('reported_by')} ${esc(profileById(c.created_by)?.nick || '?')}</div>
+      <div class="mcard-status">${statusLine(c)}</div>
+      ${acts.length ? `<div class="row">${acts.map((a) => `<button class="btn ${a.cls} ${a.staff ? 'staff' : ''}" data-act="${a.act}" data-id="${esc(c.id)}">${a.label}</button>`).join('')}</div>` : ''}
+    </div>`;
+  }
   return `<div class="mcard st-${c.status}">
     <div class="mcard-head">
       <a href="#/map/${esc(c.court_id)}">${SPORT_ICON[sp] || ''} ${esc(courtName(court))}</a>
@@ -137,6 +170,7 @@ export function challengeCard(c, compact = false) {
     ${refereeLine(c)}
     ${reportsBlock(c)}
     ${c.video_url ? `<a class="small" href="${esc(c.video_url)}" target="_blank" rel="noopener">🎬 ${t('match_video')}</a>` : ''}
+    ${myStat ? `<div class="small ref">📊 ${t('stats_mine')}: ${Object.entries(myStat.stats).map(([k, v]) => `${t('st_' + k)} <b>${v}</b>`).join(' · ')} <span class="pill ${myStat.status === 'approved' ? 'ok' : myStat.status === 'rejected' ? 'err' : ''}">${t('mst_' + myStat.status)}</span></div>` : ''}
     ${acts.length ? `<div class="row">${acts.map((a) => `<button class="btn ${a.cls} ${a.staff ? 'staff' : ''}" data-act="${a.act}" data-id="${esc(c.id)}">${a.label}</button>`).join('')}</div>` : ''}
   </div>`;
 }
@@ -144,6 +178,25 @@ export function challengeCard(c, compact = false) {
 const findCh = (id) => store.data.challenges.find((x) => x.id === id);
 
 export const challengeHandlers = {
+  support: (d) => act('support_challenge', { p_id: d.id }, 'ok_supported'),
+  'rv-yes': (d) => act('admin_review_challenge', { p_id: d.id, p_approve: true, p_note: null }, 'ok_approved_action'),
+  'rv-no': (d) => {
+    modal(`<h3>✖ ${t('reject')}</h3><label>${t('reject_reason')}<input id="rr" maxlength="200"></label>
+      <div class="row end"><button class="btn ghost" data-close>${t('cancel')}</button><button class="btn primary" id="ok">${t('reject')}</button></div>`,
+    (m, close) => { m.querySelector('#ok').onclick = async () => { if (await act('admin_review_challenge', { p_id: d.id, p_approve: false, p_note: m.querySelector('#rr').value }, 'ok_saved')) close(); }; });
+  },
+  stats(d) {
+    const c = findCh(d.id);
+    const keys = STAT_KEYS[challengeSport(c)] || STAT_KEYS.basketball;
+    const cur = store.data.match_stats.find((m) => m.challenge_id === c.id && m.player_id === store.me.id)?.stats || {};
+    modal(`<h3>📊 ${t('stats_send')}</h3><p class="small muted">${t('stats_hint')}</p>
+      <div class="stat-in">${keys.map((k) => `<label>${t('st_' + k)}<input type="number" min="0" max="200" inputmode="numeric" data-k="${k}" value="${cur[k] ?? 0}"></label>`).join('')}</div>
+      <div class="row end"><button class="btn ghost" data-close>${t('cancel')}</button><button class="btn primary" id="ok">${t('send')}</button></div>`,
+    (m, close) => { m.querySelector('#ok').onclick = async () => {
+      const stats = Object.fromEntries(keys.map((k) => [k, parseInt(m.querySelector(`[data-k=${k}]`).value, 10) || 0]));
+      if (await act('submit_match_stats', { p_id: c.id, p_stats: stats }, 'ok_stats_sent')) close();
+    }; });
+  },
   accept: (d) => act('accept_challenge', { p_id: d.id }, 'ok_accepted'),
   async forfeit(d) { if (await confirmBox(t('forfeit_confirm'))) act('forfeit_challenge', { p_id: d.id }, 'ok_saved'); },
   cancel: (d) => act('cancel_challenge', { p_id: d.id }, 'ok_saved'),
@@ -254,7 +307,7 @@ export function renderMatches(root) {
       <div class="seg">${['all', ...SPORTS].map((s) => `<button data-act="sport" data-s="${s}" class="${ui.sport === s ? 'on' : ''}">${s === 'all' ? t('all') : SPORT_ICON[s]}</button>`).join('')}</div>
     </div>
     <details class="rules"><summary>📜 ${t('rules_title')}</summary>
-      <ol>${[1, 2, 3, 4, 5, 6, 7].map((i) => `<li>${t('rule_' + i, { r: RULES.CHECKIN_RADIUS_M, h: RULES.ACCEPT_HOURS, m: 30, p: RULES.PROTECTION_HOURS })}</li>`).join('')}</ol></details>
+      <ol>${[1, 2, 3, 4, 5, 6, 7].map((i) => `<li>${t('rule_' + i, { r: RULES.CHECKIN_RADIUS_M, h: RULES.ACCEPT_HOURS, m: 30, p: RULES.PROTECTION_HOURS, b: RULES.BACKERS })}</li>`).join('')}</ol></details>
     ${needs.length ? sec('🔔 ' + t('needs_action'), needs, '') : ''}
     ${sec('⚔️ ' + t('active'), active, t('no_active'))}
     ${tab === 'ref' ? '' : sec('🏁 ' + t('finished'), done, t('no_matches'))}`;

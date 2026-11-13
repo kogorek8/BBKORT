@@ -5,7 +5,7 @@
 import { RULES, OPEN_STATUSES, SPORTS, REVIEW_AREAS, OG_MIN_TOTAL, OG_MIN, distM, H, M } from '../rules.js';
 import { skillKeys } from '../skills.js';
 
-const KEY = 'bbkort_demo_v4';
+const KEY = 'bbkort_demo_v5';
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const err = (code) => new Error(code);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -37,7 +37,7 @@ function seed() {
     skills: base ? { [sport]: genSkills(sport, 7919 * ++n + number, base) } : {},
     skills_pending: null, skills_pending_sport: null, skills_video: null,
     skills_status: base ? 'approved' : 'none', skills_note: null, skills_submitted_at: null,
-    ghost_count: 0, created_at: iso(now - 20 * day + n * H), ...extra,
+    ghost_count: 0, coins: 0, xp: 0, checkins: 0, frame: null, owned: [], invited_by: null, created_at: iso(now - 20 * day + n * H), ...extra,
   });
   const profiles = [
     P('admin', 'Admin (Ty)', null, 'basketball', null, null, null, 0, { is_admin: true }),
@@ -82,7 +82,7 @@ function seed() {
   ];
 
   const ch = (o) => ({
-    referee_id: null, challenger_report: null, defender_report: null, score_challenger: null, score_defender: null,
+    kind: 'challenge', created_by: null, referee_id: null, challenger_report: null, defender_report: null, score_challenger: null, score_defender: null,
     video_url: null, winner_team_id: null, note: null, resolved_by: null, resolved_at: null, ...o,
   });
   const challenges = [
@@ -152,8 +152,56 @@ function seed() {
     .map(([game_id, player_id]) => ({ game_id, player_id, joined_at: iso(now - H) }));
   const court_issues = [{ id: 1, court_id: 'c3', player_id: 'u8', text: 'Obręcz się rusza, brak siatki', status: 'open', created_at: iso(now - 2 * day) }];
 
+  // --- "gra": monety, obecność, zgłoszenia do akceptacji, statystyki, sklep, dropy, aktualności
+  const wallet = { u1: [340, 520, 22, 'frame_gold'], u2: [95, 95, 6], u4: [210, 400, 15, 'frame_fire'], u7: [120, 180, 9], u9: [260, 610, 31, 'frame_neon'], u20: [80, 140, 7], u23: [150, 230, 12], u5: [20, 20, 1], u11: [0, 0, 0] };
+  for (const p of profiles) { const w = wallet[p.id]; if (w) Object.assign(p, { coins: w[0], xp: w[1], checkins: w[2], frame: w[3] || null, owned: w[3] ? [w[3]] : [] }); }
+  profiles.find((p) => p.id === 'u2').invited_by = 'u1';
+  const dkey = (i) => { const d = new Date(now - i * day); const z = (x) => String(x).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+  const coin_ledger = [1, 2].map((i) => ({ id: i, player_id: 'u1', amount: 5, reason: 'daily_checkin', key: 'daily:checkin:' + dkey(i), created_at: iso(now - i * day) }))
+    .concat([{ id: 10, player_id: 'u1', amount: 25, reason: 'win', key: 'match:x', created_at: iso(now - 3 * day) }, { id: 11, player_id: 'u1', amount: 50, reason: 'team_create', key: 'team_create', created_at: iso(now - 30 * day) }]);
+  const court_presence = [['c1', 'u5', 25], ['c1', 'u8', 40], ['c5', 'u10', 10], ['c9', 'u21', 55]].map(([court_id, player_id, m], i) => ({ id: i + 1, court_id, player_id, at: iso(now - m * M) }));
+  challenges.push(
+    ch({ id: 'ch5', court_id: 'c2', challenger_team_id: 't1', defender_team_id: 't2', scheduled_at: iso(now + 4 * day), status: 'proposed',
+      accept_deadline: iso(now + 48 * H), created_by: 'u2', created_at: iso(now - 2 * H) }),
+    ch({ id: 'ch6', kind: 'claim', court_id: 'c6', challenger_team_id: 't4', defender_team_id: null, scheduled_at: iso(now - 1 * H), status: 'review',
+      accept_deadline: iso(now + 47 * H), created_by: 'u9', created_at: iso(now - 1 * H) }),
+  );
+  challenges.forEach((c) => { if (!c.created_by) c.created_by = teams.find((t) => t.id === c.challenger_team_id)?.captain_id; });
+  const challenge_backers = [['ch5', 'u2'], ['ch6', 'u9']].map(([challenge_id, player_id]) => ({ challenge_id, player_id }));
+  const match_stats = [
+    { challenge_id: 'ch3', player_id: 'u4', team_id: 't2', stats: { pts: 12, reb: 4, ast: 3, stl: 2, blk: 0 }, status: 'approved', note: null, reviewed_by: 'admin', created_at: iso(now - 3 * day) },
+    { challenge_id: 'ch3', player_id: 'u7', team_id: 't3', stats: { pts: 11, reb: 6, ast: 1, stl: 1, blk: 1 }, status: 'approved', note: null, reviewed_by: 'admin', created_at: iso(now - 3 * day) },
+    { challenge_id: 'ch4', player_id: 'u23', team_id: 'f2', stats: { goals: 3, ast: 1, saves: 0 }, status: 'pending', note: null, reviewed_by: null, created_at: iso(now - 17 * H) },
+  ];
+  const player_badges = [{ player_id: 'u9', code: 'og_founder', note: 'Pierwsza drużyna w BBKORT', granted_at: iso(now - 12 * day) }];
+  const posts = [
+    { id: 'p1', kind: 'contest', title: 'Konkurs miesiąca: najwięcej meldunków na boiskach', body: 'Zawodnik z największą liczbą meldunków w tym miesiącu wygrywa metalową siatkę na swoje boisko. Liczy się każdy dzień!', image_url: null, link_url: null, active: true, pinned: true, created_at: iso(now - 2 * day) },
+    { id: 'p2', kind: 'news', title: 'Ruszamy z kartami OG SPOT w Rzeszowie', body: 'Pierwsze boiska sprawdzone: Bulwary i Baranówka. Zgłaszajcie kolejne!', image_url: null, link_url: '#/spots', active: true, pinned: false, created_at: iso(now - 5 * day) },
+    { id: 'p3', kind: 'ad', title: 'Tu może być Twoja marka', body: 'Miejsce dla partnera sezonu – sklep sportowy, lokalna firma, klub.', image_url: null, link_url: null, active: true, pinned: false, created_at: iso(now - 6 * day) },
+  ];
+  const shop_items = [
+    ['frame_gold', 'cosmetic', 'Złota ramka karty', 'Twoja karta zawodnika w złocie.', 150, null, true],
+    ['frame_fire', 'cosmetic', 'Ramka „On Fire”', 'Ognista ramka dla tych, którzy są w gazie.', 300, null, true],
+    ['frame_ice', 'cosmetic', 'Ramka „Ice Cold”', 'Lodowa ramka dla chłodnych głów.', 300, null, true],
+    ['frame_neon', 'cosmetic', 'Ramka „Neon Court”', 'Neonowa ramka – widać Cię z daleka.', 500, null, true],
+    ['perk_reschedule', 'perk', 'Przeniesienie meczu', 'Jednorazowa zmiana terminu wyzwania (zatwierdza admin).', 200, null, true],
+    ['perk_shield', 'perk', 'Tarcza 48 h', 'Wasze boisko nie może być wyzwane przez 48 h (włącza admin).', 400, null, true],
+    ['perk_visit', 'perk', 'Wizyta OG SPOT', 'Wskaż boisko – przyjedziemy je ocenić w pierwszej kolejności.', 800, null, true],
+    ['reward_net', 'reward', 'Metalowa siatka na Twoje boisko', 'Nagroda od partnera sezonu (przykład).', 1500, 5, true],
+    ['reward_ball', 'reward', 'Piłka meczowa', 'Nagroda od partnera sezonu (przykład).', 2500, 3, true],
+  ].map(([code, kind, title, descr, cost, stock, active], i) => ({ id: 'it' + i, code, kind, title, descr, cost, stock, image_url: null, sponsor: kind === 'reward' ? 'Partner sezonu' : null, active, sort: 10 + i }));
+  const purchases = [{ id: 'pu1', player_id: 'u4', item_id: 'it5', cost: 400, status: 'pending', note: 'Park Papieski', created_at: iso(now - 6 * H) }];
+  const drops = [{ id: 'd1', title: 'Drop #1: piłka pod koszem', hint: 'Boisko nad rzeką, tam gdzie kosz patrzy na most. Kod jest na naklejce pod ławką.', prize: 'Piłka do streetballa', coins: 100, image_url: null, status: 'active', claimed_by: null, claimed_at: null, created_at: iso(now - 20 * H) }];
+  const drop_codes = { d1: 'og-2027' };
+  const notifications = [
+    { id: 1, player_id: 'u1', kind: 'presence', data: { nick: 'Mateusz', court: 'Bulwary nad Wisłokiem – kosz', team: 'NMH' }, link: 'map/c1', read: false, created_at: iso(now - 25 * M) },
+    { id: 2, player_id: 'u1', kind: 'support_needed', data: { nick: 'Szymon', court: 'Park Papieski', kind: 'challenge' }, link: 'matches', read: false, created_at: iso(now - 2 * H) },
+    { id: 3, player_id: 'u1', kind: 'drop_new', data: { title: 'Drop #1: piłka pod koszem' }, link: 'home', read: true, created_at: iso(now - 20 * H) },
+  ];
+
   return {
-    version: 4, time_offset: 0, fake_gps: true, current_user: 'admin',
+    version: 5, time_offset: 0, fake_gps: true, current_user: 'admin',
+    coin_ledger, court_presence, challenge_backers, match_stats, player_badges, posts, shop_items, purchases, drops, drop_codes, notifications,
     teams, profiles, courts, challenges, challenge_players, court_history, court_ratings,
     court_reviews, team_requests, games, game_players, court_issues,
   };
@@ -162,7 +210,7 @@ function seed() {
 export function create() {
   let S;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch { S = null; }
-  if (!S || S.version !== 4) S = seed();
+  if (!S || S.version !== 5) S = seed();
 
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* ignore */ } };
   const now = () => Date.now() + S.time_offset;
@@ -190,16 +238,54 @@ export function create() {
   const ghost = (pid) => { const p = S.profiles.find((x) => x.id === pid); if (p) p.ghost_count++; };
   const history = (court_id, team_id, event, challenge_id = null) =>
     S.court_history.push({ id: Date.now() + Math.random(), court_id, team_id, event, challenge_id, at: iso(now()) });
+  const today = () => { const d = new Date(now()); const z = (x) => String(x).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+  const coin = (pid, amount, reason, key) => {
+    const x = S.profiles.find((q) => q.id === pid);
+    if (!x || !amount || S.coin_ledger.some((l) => l.player_id === pid && l.key === key)) return false;
+    S.coin_ledger.push({ id: Date.now() + Math.random(), player_id: pid, amount, reason, key, created_at: iso(now()) });
+    x.coins += amount; x.xp += Math.max(amount, 0);
+    return true;
+  };
+  const notify = (pid, kind, data = {}, link = null) => { if (pid) S.notifications.unshift({ id: Date.now() + Math.random(), player_id: pid, kind, data, link, read: false, created_at: iso(now()) }); };
+  const notifyTeam = (tid, kind, data, link, except) => S.profiles.filter((q) => q.team_id === tid && q.id !== except).forEach((q) => notify(q.id, kind, data, link));
+  const notifyStaff = (kind, data, link) => S.profiles.filter((q) => q.is_admin).forEach((q) => notify(q.id, kind, data, link));
+  const newAction = (p, c, kind, t) => {
+    if (!p.team_id) throw err('err_no_team');
+    const tm = team(p.team_id);
+    if (c.sport !== tm.sport) throw err('err_wrong_sport');
+    if (S.challenges.some((x) => x.court_id === c.id && OPEN_STATUSES.includes(x.status))) throw err('err_court_busy');
+    if (kind === 'claim') { if (c.king_team_id) throw err('err_court_taken'); }
+    else {
+      if (!c.king_team_id) throw err('err_court_free');
+      if (c.king_team_id === p.team_id) throw err('err_own_court');
+      if (c.protected_until && T(c.protected_until) > now()) throw err('err_protected');
+      if (isNaN(t) || t < now() + RULES.MIN_LEAD_MIN * M || t > now() + RULES.MAX_LEAD_DAYS * 24 * H) throw err('err_bad_time');
+    }
+    const cap = tm.captain_id === p.id;
+    const id = 'ch' + uid();
+    S.challenges.push({
+      id, kind, created_by: p.id, court_id: c.id, challenger_team_id: p.team_id, defender_team_id: kind === 'claim' ? null : c.king_team_id,
+      scheduled_at: iso(kind === 'claim' ? now() : t), status: cap ? 'review' : 'proposed', accept_deadline: iso(now() + RULES.ACCEPT_HOURS * H),
+      referee_id: null, challenger_report: null, defender_report: null, score_challenger: null, score_defender: null,
+      video_url: null, winner_team_id: null, note: null, resolved_by: null, resolved_at: null, created_at: iso(now()),
+    });
+    S.challenge_backers.push({ challenge_id: id, player_id: p.id });
+    if (kind === 'challenge') S.challenge_players.push({ challenge_id: id, player_id: p.id, team_id: p.team_id, checked_in_at: null });
+    if (cap) notifyStaff('review_needed', { court: c.name, team: tm.tag, kind }, 'admin');
+    else notifyTeam(p.team_id, 'support_needed', { court: c.name, nick: p.nick, kind }, 'matches', p.id);
+    return id;
+  };
   const joinTeam = (tid, pid) => {
     const x = S.profiles.find((q) => q.id === pid);
     if (x.team_id) throw err('err_already_in_team');
     Object.assign(x, { team_id: tid, sport: team(tid).sport });
+    coin(pid, 20, 'team_join', 'team_join');
     S.team_requests = S.team_requests.filter((r) => r.player_id !== pid);
   };
   const validScore = (a, b) => Number.isInteger(a) && Number.isInteger(b) && a >= 0 && b >= 0 && a !== b;
 
   function finalize(ch, winner, status, note, by) {
-    if (!OPEN_STATUSES.includes(ch.status)) return;
+    if (!['pending', 'accepted', 'reported'].includes(ch.status)) return;
     const prev = ch.status;
     Object.assign(ch, { status, winner_team_id: winner, note: note ?? ch.note, resolved_at: iso(now()), resolved_by: by || null });
     if (['accepted', 'reported'].includes(prev) && status !== 'void') {
@@ -216,6 +302,10 @@ export function create() {
       c.protected_until = iso(now() + RULES.PROTECTION_HOURS * H);
       history(c.id, winner, 'defend', ch.id);
     }
+    S.challenge_players.filter((x) => x.challenge_id === ch.id && x.checked_in_at)
+      .forEach((x) => coin(x.player_id, x.team_id === winner ? 25 : 5, x.team_id === winner ? 'win' : 'played', 'match:' + ch.id));
+    notifyTeam(ch.challenger_team_id, 'result', { court: c.name, won: winner === ch.challenger_team_id }, 'matches');
+    notifyTeam(ch.defender_team_id, 'result', { court: c.name, won: winner === ch.defender_team_id }, 'matches');
   }
 
   const R = {
@@ -223,6 +313,7 @@ export function create() {
     update_profile({ p_nick, p_position, p_number, p_height, p_sport }) {
       const p = me();
       if (p_nick && p_nick.trim()) p.nick = p_nick.trim().slice(0, 24);
+      if (!p.position && p_position) coin(p.id, 10, 'profile', 'profile');
       Object.assign(p, { position: p_position || null, number: p_number ?? null, height_cm: p_height ?? null });
       if (!p.team_id && SPORTS.includes(p_sport)) p.sport = p_sport;
     },
@@ -251,6 +342,7 @@ export function create() {
       const id = 't' + uid();
       S.teams.push({ id, name, tag, color: p_color || '#ff7a1a', sport: p_sport, captain_id: p.id, rating: null, created_at: iso(now()) });
       Object.assign(p, { team_id: id, sport: p_sport });
+      coin(p.id, 50, 'team_create', 'team_create');
       return id;
     },
     join_team({ p_team }) { return R.request_join({ p_team }); },
@@ -259,7 +351,7 @@ export function create() {
       if (p.team_id) throw err('err_already_in_team');
       if (!team(p_team)) throw err('err_not_found');
       if (S.team_requests.some((r) => r.team_id === p_team && r.player_id === p.id && r.kind === 'invite')) { joinTeam(p_team, p.id); return 'joined'; }
-      if (!S.team_requests.some((r) => r.team_id === p_team && r.player_id === p.id)) S.team_requests.push({ team_id: p_team, player_id: p.id, kind: 'request', created_at: iso(now()) });
+      if (!S.team_requests.some((r) => r.team_id === p_team && r.player_id === p.id)) { S.team_requests.push({ team_id: p_team, player_id: p.id, kind: 'request', created_at: iso(now()) }); notify(team(p_team).captain_id, 'team_request', { nick: p.nick }, 'team/' + p_team); }
       return 'requested';
     },
     invite_player({ p_player }) {
@@ -269,7 +361,7 @@ export function create() {
       if (!x) throw err('err_not_found');
       if (x.team_id) throw err('err_player_in_team');
       if (S.team_requests.some((r) => r.team_id === p.team_id && r.player_id === p_player && r.kind === 'request')) { joinTeam(p.team_id, p_player); return 'joined'; }
-      if (!S.team_requests.some((r) => r.team_id === p.team_id && r.player_id === p_player)) S.team_requests.push({ team_id: p.team_id, player_id: p_player, kind: 'invite', created_at: iso(now()) });
+      if (!S.team_requests.some((r) => r.team_id === p.team_id && r.player_id === p_player)) { S.team_requests.push({ team_id: p.team_id, player_id: p_player, kind: 'invite', created_at: iso(now()) }); notify(p_player, 'team_invite', { team: team(p.team_id).tag }, 'home'); }
       return 'invited';
     },
     respond_team_request({ p_team, p_player, p_accept }) {
@@ -326,42 +418,50 @@ export function create() {
       return n;
     },
     claim_court({ p_court, p_lat, p_lng }) {
-      const p = me();
-      if (!p.team_id) throw err('err_no_team');
-      const c = getCourt(p_court);
-      if (c.sport !== team(p.team_id).sport) throw err('err_wrong_sport');
-      if (c.king_team_id) throw err('err_court_taken');
+      const p = me(), c = getCourt(p_court);
       checkDist(c, p_lat, p_lng);
-      Object.assign(c, { king_team_id: p.team_id, king_since: iso(now()), defenses: 0, protected_until: iso(now() + RULES.PROTECTION_HOURS * H) });
-      history(c.id, p.team_id, 'claim');
+      newAction(p, c, 'claim', null);
     },
-    // ---- wyzwania
-    create_challenge({ p_court, p_time }) {
-      const p = me();
-      if (!p.team_id) throw err('err_no_team');
-      if (!isCap(p.id, p.team_id)) throw err('err_not_captain');
-      const c = getCourt(p_court);
-      if (c.sport !== team(p.team_id).sport) throw err('err_wrong_sport');
-      if (!c.king_team_id) throw err('err_court_free');
-      if (c.king_team_id === p.team_id) throw err('err_own_court');
-      if (c.protected_until && T(c.protected_until) > now()) throw err('err_protected');
-      if (S.challenges.some((x) => x.court_id === c.id && OPEN_STATUSES.includes(x.status))) throw err('err_court_busy');
-      const t = T(p_time);
-      if (isNaN(t) || t < now() + RULES.MIN_LEAD_MIN * M || t > now() + RULES.MAX_LEAD_DAYS * 24 * H) throw err('err_bad_time');
-      const id = 'ch' + uid();
-      S.challenges.push({
-        id, court_id: c.id, challenger_team_id: p.team_id, defender_team_id: c.king_team_id,
-        scheduled_at: iso(t), status: 'pending', accept_deadline: iso(Math.min(now() + RULES.ACCEPT_HOURS * H, t)),
-        referee_id: null, challenger_report: null, defender_report: null, score_challenger: null, score_defender: null,
-        video_url: null, winner_team_id: null, note: null, resolved_by: null, resolved_at: null, created_at: iso(now()),
-      });
-      S.challenge_players.push({ challenge_id: id, player_id: p.id, team_id: p.team_id, checked_in_at: null });
-      return id;
+    // ---- wyzwania (kapitan sam albo 3 zawodników; potem akceptacja admina)
+    create_challenge({ p_court, p_time }) { return newAction(me(), getCourt(p_court), 'challenge', T(p_time)); },
+    support_challenge({ p_id }) {
+      const p = me(), ch = getCh(p_id);
+      if (ch.status !== 'proposed') throw err('err_bad_state');
+      if (p.team_id !== ch.challenger_team_id) throw err('err_not_in_match');
+      if (!S.challenge_backers.some((b) => b.challenge_id === ch.id && b.player_id === p.id)) S.challenge_backers.push({ challenge_id: ch.id, player_id: p.id });
+      if (S.challenge_backers.filter((b) => b.challenge_id === ch.id).length >= RULES.BACKERS || isCap(p.id, ch.challenger_team_id)) {
+        ch.status = 'review';
+        notifyStaff('review_needed', { court: getCourt(ch.court_id).name, team: team(ch.challenger_team_id)?.tag, kind: ch.kind }, 'admin');
+      }
+    },
+    admin_review_challenge({ p_id, p_approve, p_note }) {
+      const p = staff(), ch = getCh(p_id), c = getCourt(ch.court_id);
+      if (!['proposed', 'review'].includes(ch.status)) throw err('err_bad_state');
+      if (!p_approve) {
+        Object.assign(ch, { status: 'rejected', note: p_note || null, resolved_at: iso(now()), resolved_by: p.id });
+        notifyTeam(ch.challenger_team_id, 'action_rejected', { court: c.name, kind: ch.kind, note: p_note }, 'matches');
+        return;
+      }
+      if (ch.kind === 'claim') {
+        if (c.king_team_id) throw err('err_court_taken');
+        Object.assign(c, { king_team_id: ch.challenger_team_id, king_since: iso(now()), defenses: 0, protected_until: iso(now() + RULES.PROTECTION_HOURS * H) });
+        history(c.id, ch.challenger_team_id, 'claim', ch.id);
+        Object.assign(ch, { status: 'claimed', winner_team_id: ch.challenger_team_id, resolved_at: iso(now()), resolved_by: p.id });
+        S.challenge_backers.filter((b) => b.challenge_id === ch.id).forEach((b) => coin(b.player_id, 15, 'claim', 'claim:' + ch.id));
+        notifyTeam(ch.challenger_team_id, 'claim_approved', { court: c.name }, 'map/' + c.id);
+      } else {
+        if (c.king_team_id !== ch.defender_team_id) throw err('err_bad_state');
+        if (T(ch.scheduled_at) < now() + 60 * M) throw err('err_bad_time');
+        Object.assign(ch, { status: 'pending', accept_deadline: iso(Math.min(now() + RULES.ACCEPT_HOURS * H, T(ch.scheduled_at))) });
+        coin(ch.created_by, 10, 'challenge', 'challenge:' + ch.id);
+        notifyTeam(ch.defender_team_id, 'challenged', { court: c.name, team: team(ch.challenger_team_id)?.tag }, 'matches');
+        notifyTeam(ch.challenger_team_id, 'challenge_approved', { court: c.name }, 'matches');
+      }
     },
     cancel_challenge({ p_id }) {
       const p = me(), ch = getCh(p_id);
-      if (ch.status !== 'pending') throw err('err_bad_state');
-      if (!isCap(p.id, ch.challenger_team_id)) throw err('err_not_captain');
+      if (!['proposed', 'review', 'pending'].includes(ch.status)) throw err('err_bad_state');
+      if (ch.created_by !== p.id && !isCap(p.id, ch.challenger_team_id)) throw err('err_not_captain');
       Object.assign(ch, { status: 'cancelled', resolved_at: iso(now()) });
     },
     accept_challenge({ p_id }) {
@@ -449,6 +549,7 @@ export function create() {
     resolve_expired() {
       let n = 0;
       for (const ch of S.challenges) {
+        if (ch.status === 'proposed' && T(ch.created_at) + 48 * H < now()) { Object.assign(ch, { status: 'expired', note: 'no_support', resolved_at: iso(now()) }); continue; }
         if (ch.status === 'pending' && T(ch.accept_deadline) < now()) {
           ghost(team(ch.defender_team_id)?.captain_id);
           finalize(ch, ch.challenger_team_id, 'walkover', 'no_response', null); n++;
@@ -465,6 +566,7 @@ export function create() {
       const vals = Object.values(p_scores || {});
       if (!vals.length || vals.length > 12 || vals.some((v) => !Number.isInteger(v) || v < 1 || v > 5)) throw err('err_bad_rating');
       S.court_ratings = S.court_ratings.filter((r) => !(r.court_id === p_court && r.player_id === p.id));
+      coin(p.id, 5, 'rate', 'rate:' + p_court);
       S.court_ratings.push({ court_id: p_court, player_id: p.id, scores: p_scores, comment: (p_comment || '').trim().slice(0, 280) || null, created_at: iso(now()) });
     },
     admin_delete_rating({ p_court, p_player }) {
@@ -514,7 +616,7 @@ export function create() {
       staff();
       const c = getCourt(p_court);
       if (c.status !== 'pending') return;
-      if (p_approve) c.status = 'active'; else S.courts = S.courts.filter((x) => x.id !== p_court);
+      if (p_approve) { c.status = 'active'; coin(c.added_by, 30, 'court_added', 'court:' + c.id); } else S.courts = S.courts.filter((x) => x.id !== p_court);
     },
     // ---- otwarte gry
     create_game({ p_court, p_time, p_slots, p_level, p_note }) {
@@ -526,6 +628,7 @@ export function create() {
       const id = 'g' + uid();
       S.games.push({ id, court_id: c.id, host_id: p.id, sport: c.sport, starts_at: iso(t), slots: p_slots, level: p_level || 'all', note: (p_note || '').trim().slice(0, 200) || null, status: 'open', created_at: iso(now()) });
       S.game_players.push({ game_id: id, player_id: p.id, joined_at: iso(now()) });
+      coin(p.id, 5, 'game', 'daily:game:' + today());
       return id;
     },
     join_game({ p_game }) {
@@ -535,6 +638,8 @@ export function create() {
       if (S.game_players.some((x) => x.game_id === g.id && x.player_id === p.id)) return;
       if (S.game_players.filter((x) => x.game_id === g.id).length >= g.slots) throw err('err_game_full');
       S.game_players.push({ game_id: g.id, player_id: p.id, joined_at: iso(now()) });
+      coin(p.id, 5, 'game', 'daily:game:' + today());
+      notify(g.host_id, 'game_joined', { nick: p.nick }, 'games');
     },
     leave_game({ p_game }) {
       const p = me();
@@ -548,9 +653,140 @@ export function create() {
       const p = me();
       getCourt(p_court);
       if ((p_text || '').trim().length < 3) throw err('err_bad_request');
+      coin(p.id, 3, 'issue', 'daily:issue:' + today());
       S.court_issues.push({ id: Date.now(), court_id: p_court, player_id: p.id, text: p_text.trim().slice(0, 300), status: 'open', created_at: iso(now()) });
     },
     resolve_issue({ p_id }) { staff(); const i = S.court_issues.find((x) => String(x.id) === String(p_id)); if (i) i.status = 'resolved'; },
+    // ---- kto teraz gra
+    check_in_court({ p_court, p_lat, p_lng }) {
+      const p = me(), c = getCourt(p_court);
+      checkDist(c, p_lat, p_lng);
+      if (S.court_presence.some((x) => x.court_id === c.id && x.player_id === p.id && T(x.at) > now() - RULES.PRESENCE_HOURS * H)) return;
+      S.court_presence.push({ id: Date.now(), court_id: c.id, player_id: p.id, at: iso(now()) });
+      p.checkins++;
+      if (coin(p.id, 5, 'daily_checkin', 'daily:checkin:' + today())) {
+        let streak = 1;
+        const dayKey = (i) => { const d = new Date(now() - i * 24 * H); const z = (x) => String(x).padStart(2, '0'); return `daily:checkin:${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+        while (S.coin_ledger.some((l) => l.player_id === p.id && l.key === dayKey(streak))) streak++;
+        if (streak % 7 === 0) coin(p.id, 20, 'streak7', 'streak7:' + today());
+        else if (streak % 7 === 3) coin(p.id, 5, 'streak3', 'streak3:' + today());
+      }
+      if (c.king_team_id && c.king_team_id !== p.team_id) notifyTeam(c.king_team_id, 'presence', { nick: p.nick, court: c.name, team: team(p.team_id)?.tag }, 'map/' + c.id);
+    },
+    mark_notifications_read() { S.notifications.forEach((n) => { if (n.player_id === S.current_user) n.read = true; }); },
+    // ---- statystyki po meczu
+    submit_match_stats({ p_id, p_stats }) {
+      const p = me(), ch = getCh(p_id);
+      if (!['accepted', 'reported', 'confirmed'].includes(ch.status)) throw err('err_bad_state');
+      if (![ch.challenger_team_id, ch.defender_team_id].includes(p.team_id)) throw err('err_not_in_match');
+      const vals = Object.values(p_stats || {});
+      if (!vals.length || vals.some((v) => !Number.isInteger(v) || v < 0 || v > 200)) throw err('err_bad_stats');
+      if (S.match_stats.some((m) => m.challenge_id === ch.id && m.player_id === p.id && m.status === 'approved')) throw err('err_bad_state');
+      S.match_stats = S.match_stats.filter((m) => !(m.challenge_id === ch.id && m.player_id === p.id));
+      S.match_stats.push({ challenge_id: ch.id, player_id: p.id, team_id: p.team_id, stats: p_stats, status: 'pending', note: null, reviewed_by: null, created_at: iso(now()) });
+    },
+    review_match_stats({ p_id, p_player, p_approve, p_stats, p_note }) {
+      const p = staff();
+      const m = S.match_stats.find((x) => x.challenge_id === p_id && x.player_id === p_player);
+      if (!m) return;
+      Object.assign(m, { stats: p_stats || m.stats, status: p_approve ? 'approved' : 'rejected', note: p_note || null, reviewed_by: p.id });
+      if (p_approve) coin(p_player, 5, 'stats', 'stats:' + p_id);
+      notify(p_player, p_approve ? 'stats_approved' : 'stats_rejected', {}, 'player/me');
+    },
+    admin_set_skills({ p_player, p_sport, p_skills }) {
+      staff();
+      const x = S.profiles.find((q) => q.id === p_player);
+      if (!x || Object.values(p_skills || {}).some((v) => typeof v !== 'number' || v < 25 || v > 99)) throw err('err_bad_skills');
+      Object.assign(x, { skills: { ...(x.skills || {}), [p_sport]: p_skills }, skills_pending: null, skills_pending_sport: null, skills_status: 'approved' });
+      notify(p_player, 'skills_updated', {}, 'player/me');
+    },
+    grant_badge({ p_player, p_code, p_note, p_on }) {
+      admin();
+      S.player_badges = S.player_badges.filter((b) => !(b.player_id === p_player && b.code === p_code));
+      if (p_on) { S.player_badges.push({ player_id: p_player, code: p_code, note: p_note || null, granted_at: iso(now()) }); notify(p_player, 'badge', { code: p_code }, 'player/me'); }
+    },
+    // ---- aktualności / reklamy / konkursy
+    save_post({ p_id, p_data }) {
+      admin();
+      const id = p_id || 'p' + uid();
+      const old = S.posts.find((x) => x.id === id);
+      const row = { id, kind: p_data.kind || 'news', title: (p_data.title || '').trim(), body: p_data.body || null, image_url: p_data.image_url || null, link_url: p_data.link_url || null,
+        active: p_data.active !== false, pinned: !!p_data.pinned, created_at: old?.created_at || iso(now()) };
+      if (row.title.length < 2) throw err('err_bad_request');
+      S.posts = S.posts.filter((x) => x.id !== id); S.posts.push(row);
+      return id;
+    },
+    delete_post({ p_id }) { admin(); S.posts = S.posts.filter((x) => x.id !== p_id); },
+    // ---- sklep
+    buy_item({ p_item, p_note }) {
+      const p = me();
+      const it = S.shop_items.find((x) => x.id === p_item && x.active);
+      if (!it) throw err('err_not_found');
+      if (it.stock != null && it.stock <= 0) throw err('err_out_of_stock');
+      if (p.coins < it.cost) throw err('err_no_coins');
+      if (it.kind === 'cosmetic' && p.owned.includes(it.code)) throw err('err_already_owned');
+      const id = 'pu' + uid();
+      S.purchases.push({ id, player_id: p.id, item_id: it.id, cost: it.cost, status: it.kind === 'cosmetic' ? 'done' : 'pending', note: (p_note || '').slice(0, 200) || null, created_at: iso(now()) });
+      coin(p.id, -it.cost, 'buy', 'buy:' + id);
+      if (it.stock != null) it.stock--;
+      if (it.kind === 'cosmetic') { p.owned.push(it.code); p.frame = it.code; } else notifyStaff('purchase', { nick: p.nick, item: it.title }, 'admin');
+    },
+    equip_frame({ p_code }) {
+      const p = me();
+      if (p_code && !p.owned.includes(p_code)) throw err('err_not_allowed');
+      p.frame = p_code || null;
+    },
+    admin_purchase({ p_id, p_fulfilled }) {
+      staff();
+      const pu = S.purchases.find((x) => x.id === p_id);
+      if (!pu || pu.status !== 'pending') throw err('err_bad_state');
+      pu.status = p_fulfilled ? 'fulfilled' : 'cancelled';
+      if (!p_fulfilled) { coin(pu.player_id, pu.cost, 'refund', 'refund:' + pu.id); const it = S.shop_items.find((x) => x.id === pu.item_id); if (it && it.stock != null) it.stock++; }
+      notify(pu.player_id, p_fulfilled ? 'purchase_done' : 'purchase_cancelled', {}, 'shop');
+    },
+    save_shop_item({ p_id, p_data }) {
+      admin();
+      const id = p_id || 'it' + uid();
+      const old = S.shop_items.find((x) => x.id === id) || { code: null };
+      const cost = parseInt(p_data.cost, 10);
+      if (!(cost > 0) || (p_data.title || '').trim().length < 2) throw err('err_bad_request');
+      const row = { ...old, id, kind: old.kind || p_data.kind || 'reward', title: p_data.title.trim(), descr: p_data.descr || null, cost,
+        stock: p_data.stock === '' || p_data.stock == null ? null : parseInt(p_data.stock, 10), image_url: p_data.image_url || null, sponsor: p_data.sponsor || null,
+        active: p_data.active !== false, sort: old.sort || 100 };
+      S.shop_items = S.shop_items.filter((x) => x.id !== id); S.shop_items.push(row);
+      return id;
+    },
+    // ---- dropy
+    create_drop({ p_data }) {
+      admin();
+      if ((p_data.code || '').trim().length < 4 || (p_data.title || '').trim().length < 2) throw err('err_bad_request');
+      const id = 'd' + uid();
+      S.drops.push({ id, title: p_data.title.trim(), hint: p_data.hint || null, prize: p_data.prize || null, coins: parseInt(p_data.coins, 10) || 0, image_url: p_data.image_url || null,
+        status: 'active', claimed_by: null, claimed_at: null, created_at: iso(now()) });
+      S.drop_codes[id] = p_data.code.trim().toLowerCase();
+      S.profiles.forEach((q) => notify(q.id, 'drop_new', { title: p_data.title }, 'home'));
+      return id;
+    },
+    claim_drop({ p_id, p_code }) {
+      const p = me();
+      const d = S.drops.find((x) => x.id === p_id);
+      if (!d || d.status !== 'active') throw err('err_drop_gone');
+      if (S.drop_codes[d.id] !== (p_code || '').trim().toLowerCase()) return false;
+      Object.assign(d, { status: 'claimed', claimed_by: p.id, claimed_at: iso(now()) });
+      coin(p.id, Math.max(d.coins, 0) + 20, 'drop', 'drop:' + d.id);
+      notifyStaff('drop_claimed', { nick: p.nick, title: d.title }, 'admin');
+      return true;
+    },
+    end_drop({ p_id }) { admin(); const d = S.drops.find((x) => x.id === p_id); if (d && d.status === 'active') d.status = 'ended'; },
+    set_referrer({ p_nick }) {
+      const p = me();
+      if (p.invited_by) throw err('err_bad_state');
+      const r = S.profiles.find((q) => q.nick.toLowerCase() === (p_nick || '').trim().toLowerCase() && q.id !== p.id);
+      if (!r) throw err('err_not_found');
+      p.invited_by = r.id;
+      coin(r.id, 30, 'referral', 'ref:' + p.id); coin(p.id, 10, 'referred', 'referred');
+      notify(r.id, 'referral', { nick: p.nick }, 'shop');
+    },
     // ---- admin
     admin_set_moderator({ p_player, p_on }) {
       admin();
@@ -580,10 +816,15 @@ export function create() {
     now,
     canImport: () => true,
     async load() {
-      const { teams, profiles, courts, challenges, challenge_players, court_history, court_ratings,
-        court_reviews, team_requests, games, game_players, court_issues } = S;
-      return clone({ teams, profiles, courts, challenges, challenge_players, court_history, court_ratings,
-        court_reviews, team_requests, games, game_players, court_issues });
+      const d = {};
+      for (const k of ['teams', 'profiles', 'courts', 'challenges', 'challenge_players', 'court_history', 'court_ratings', 'court_reviews', 'team_requests',
+        'games', 'game_players', 'court_issues', 'court_presence', 'challenge_backers', 'match_stats', 'player_badges', 'posts', 'shop_items', 'drops']) d[k] = S[k];
+      // prywatne: tylko swoje (jak RLS w Supabase)
+      const u = S.current_user, meP = S.profiles.find((p) => p.id === u);
+      d.coin_ledger = S.coin_ledger.filter((l) => l.player_id === u);
+      d.notifications = S.notifications.filter((n) => n.player_id === u).slice(0, 40);
+      d.purchases = S.purchases.filter((x) => x.player_id === u || (meP && (meP.is_admin || meP.is_moderator)));
+      return clone(d);
     },
     async me(data) { return data.profiles.find((p) => p.id === S.current_user) || null; },
     async rpc(name, args) {

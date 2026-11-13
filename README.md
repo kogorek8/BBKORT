@@ -7,7 +7,7 @@
 > do $$ begin execute (select content from extensions.http_get('https://raw.githubusercontent.com/kogorek8/BBKORT/claude/bbkort-web-app-30zfsx/supabase/aktualizacja-bez-komentarzy.sql')); end $$;
 > ```
 >
-> Nowe w tej wersji: oficjalne karty boisk **OG SPOT** (100 pkt w 8 obszarach), **Gramy?** (otwarte gry), dołączanie do drużyn za zgodą obu stron, dodawanie boisk i zgłaszanie usterek, start mapy w Rzeszowie.
+> Nowe w tej wersji: ekran Start z widżetami (tabela, mecze, kto teraz gra), **OG Coins** ze sklepem nagród, **dropy**, misje dnia, poziomy, **odznaki** i **sezony**, meldowanie „gram teraz” z powiadomieniem dla drużyny-króla, statystyki zawodników po meczu (zatwierdza admin), wyzwania i przejęcia zgłaszane przez kapitana lub 3 zawodników i akceptowane przez admina, 6 pasków skilli ustawianych przez admina, aktualności / konkursy / miejsce dla sponsora.
 
 Aplikacja webowa (PWA) dla koszykarzy i piłkarzy, inspirowana grami terenowymi. Na **mapie satelitarnej** widać boiska i kto nimi rządzi. Drużyny **przejmują boiska i teren**, a inne drużyny mogą je **publicznie wyzwać**. Wynik każdego meczu zatwierdza **sędzia BBKORT**. Zawodnicy mają **karty umiejętności w stylu gier sportowych**.
 

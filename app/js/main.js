@@ -1,6 +1,6 @@
 import { initApi, api } from './api/index.js';
 import { t, getLang, setLang } from './i18n.js';
-import { store, onRender, reload, softReload, myTeam, errText, isStaff } from './state.js';
+import { store, onRender, reload, softReload, myTeam, errText, isStaff, unreadCount } from './state.js';
 import { startGeo } from './geo.js';
 import { esc, teamTag } from './ui.js';
 import { initMap, refreshMap, showMap, focusCourt } from './views/map.js';
@@ -13,6 +13,9 @@ import { renderTable } from './views/table.js';
 import { renderHome, renderHow } from './views/home.js';
 import { renderGames } from './views/games.js';
 import { renderSpots } from './views/spots.js';
+import { renderShop } from './views/shop.js';
+import { renderInbox } from './views/inbox.js';
+import { renderSeason } from './views/season.js';
 
 const $ = (id) => document.getElementById(id);
 let lastFocus = null;
@@ -28,7 +31,7 @@ function renderChrome() {
   const me = store.me;
   const tm = myTeam();
   $('user-chip').innerHTML = me
-    ? `<a href="#/player/me">${tm ? teamTag(tm) + ' ' : ''}${esc(me.nick)}</a>`
+    ? `<a href="#/shop" class="top-coins">🪙 ${me.coins || 0}</a><a href="#/inbox" class="top-bell">🔔${unreadCount() ? `<i class="dot">${unreadCount()}</i>` : ''}</a><a href="#/player/me">${tm ? teamTag(tm) + ' ' : ''}${esc(me.nick)}</a>`
     : `<a href="#/login" class="btn small primary">${t('login')}</a>`;
 
   const demo = $('demo-bar');
@@ -45,10 +48,10 @@ function renderChrome() {
     ['games', '🤝', t('nav_games')],
     ['matches', '⚔️', t('nav_matches'), badge],
     ['table', '📊', t('nav_table')],
-    ...(isStaff() ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => c.status === 'reported').length + store.data.pending_courts.length]] : []),
+    ...(isStaff() ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => ['reported', 'review'].includes(c.status)).length + store.data.pending_courts.length + store.data.match_stats.filter((m) => m.status === 'pending').length + store.data.purchases.filter((x) => x.status === 'pending').length]] : []),
   ];
   $('nav').innerHTML = items.map(([key, ic, label, n, href]) => {
-    const on = r === key || (key === 'table' && (r === 'team' || r === 'teams')) || (key === 'home' && (r === 'how' || r === 'player' || r === 'spots'));
+    const on = r === key || (key === 'table' && (r === 'team' || r === 'teams')) || (key === 'home' && ['how', 'player', 'spots', 'shop', 'inbox', 'season'].includes(r));
     return `<a href="#/${href || key}" class="${on ? 'on' : ''}"><span class="ic">${ic}${n ? `<i class="dot">${n}</i>` : ''}</span><span>${label}</span></a>`;
   }).join('');
 }
@@ -74,6 +77,9 @@ function render() {
     case 'how': return renderHow(page);
     case 'games': return renderGames(page);
     case 'spots': return renderSpots(page);
+    case 'shop': return renderShop(page);
+    case 'inbox': return renderInbox(page);
+    case 'season': return renderSeason(page);
     case 'table': return renderTable(page);
     case 'teams': return renderTeams(page);
     case 'team': return renderTeam(page, r.param);

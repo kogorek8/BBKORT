@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) exit;
 function bbkort_shortcode($atts) {
     $a = shortcode_atts(array(
         'height' => 'calc(100vh - 80px)',
-        'view'   => 'map',
+        'view'   => 'home',
     ), $atts, 'bbkort');
 
     $src = plugins_url('app/index.html', __FILE__) . '#/' . rawurlencode($a['view']);

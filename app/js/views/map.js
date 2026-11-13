@@ -9,7 +9,7 @@ import { esc, bind, modal, toast, fmtDate, fmtDay, fmtLeft, fmtDist, teamTag, lo
 import {
   store, act, reload, now, T, teamById, myTeam, isCaptainOf, isAdmin, openChallengeForCourt, courtName, courtHistory,
   courtById, errText, ui, setSport, sportOk, zones, standings, lastCapture, rerender, courtRating, myCourtRating, profileById,
-  isOgSpot, reviewOf, upcomingGames, openIssues, isStaff,
+  isOgSpot, reviewOf, upcomingGames, openIssues, isStaff, presentNow, iAmPresent,
 } from '../state.js';
 import { reviewBlock, ogBadge, openReviewEditor } from './spots.js';
 import { gameCard, gameHandlers, openCreateGame } from './games.js';
@@ -174,6 +174,8 @@ export function refreshMap() {
   renderTop();
   drawZones();
   markers.clearLayers();
+  const nowBy = {};
+  presentNow().forEach((x) => { nowBy[x.court_id] = (nowBy[x.court_id] || 0) + 1; });
   for (const c of store.data.courts) {
     if (!sportOk(c.sport)) continue;
     const og = isOgSpot(c.id);
@@ -181,7 +183,7 @@ export function refreshMap() {
     const k = c.king_team_id ? teamById(c.king_team_id) : null;
     const busy = !!openChallengeForCourt(c.id);
     const html = `<div class="pin ${k ? 'owned' : 'free'}" style="--c:${k ? esc(k.color) : '#9aa3b2'}">
-        <span class="pin-ball">${SPORT_ICON[c.sport] || '🏀'}</span>${k ? `<span class="pin-crown">👑</span><span class="pin-tag">${esc(k.tag)}</span>` : ''}${busy ? '<span class="pin-fight">⚔️</span>' : ''}${og ? '<span class="pin-og">★</span>' : ''}${upcomingGames(c.id).length ? '<span class="pin-game">🤝</span>' : ''}
+        <span class="pin-ball">${SPORT_ICON[c.sport] || '🏀'}</span>${k ? `<span class="pin-crown">👑</span><span class="pin-tag">${esc(k.tag)}</span>` : ''}${busy ? '<span class="pin-fight">⚔️</span>' : ''}${og ? '<span class="pin-og">★</span>' : ''}${upcomingGames(c.id).length ? '<span class="pin-game">🤝</span>' : ''}${nowBy[c.id] ? `<span class="pin-now">${nowBy[c.id]}</span>` : ''}
       </div>`;
     const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: '', html, iconSize: [44, 52], iconAnchor: [22, 48] }) });
     m.on('click', () => openCourt(c.id));
@@ -274,15 +276,15 @@ function renderSheet() {
     actions = `<div class="small muted center">${t('other_sport_court', { s: t('sport_' + c.sport) })}</div>`;
   } else if (!king) {
     actions = `<button class="btn primary block" data-act="claim" ${near || fake ? '' : 'disabled'}>👑 ${t('claim_court')}</button>
+      <div class="small muted center">${isCaptainOf(mine.id) ? t('action_hint_cap') : t('action_hint_member', { n: RULES.BACKERS })}</div>
       ${near || fake ? '' : `<div class="small muted center">${t('be_closer', { m: RULES.CHECKIN_RADIUS_M })}</div>`}`;
   } else if (king.id === mine.id) {
     actions = `<div class="pill ok block">🏰 ${t('your_court')}</div>`;
   } else if (open) {
     actions = '';
-  } else if (!isCaptainOf(mine.id)) {
-    actions = `<div class="small muted center">${t('only_captain_challenges')}</div>`;
   } else {
-    actions = `<button class="btn primary block" data-act="challenge" ${protLeft > 0 ? 'disabled' : ''}>⚔️ ${t('challenge_king')}</button>`;
+    actions = `<button class="btn primary block" data-act="challenge" ${protLeft > 0 ? 'disabled' : ''}>⚔️ ${t('challenge_king')}</button>
+      <div class="small muted center">${isCaptainOf(mine.id) ? t('action_hint_cap') : t('action_hint_member', { n: RULES.BACKERS })}</div>`;
   }
   if (open) {
     const ct = teamById(open.challenger_team_id);
@@ -290,6 +292,7 @@ function renderSheet() {
   }
 
   const rv = reviewOf(c.id);
+  const here = presentNow(c.id);
   const games = upcomingGames(c.id);
   const issues = openIssues(c.id);
   el.innerHTML = `
@@ -298,6 +301,10 @@ function renderSheet() {
     <h2>${SPORT_ICON[c.sport]} ${esc(courtName(c))}</h2>
     <div class="small muted">${t('sport_' + c.sport)} · ${esc(c.address || '')}${d != null ? ` · ${fmtDist(d)} ${t('from_you')}` : ''}</div>
     <div class="sheet-tags">${ogBadge(rv)}${rv ? `<span class="pill">${rv.total}/100</span>` : `<span class="pill">${t('not_reviewed')}</span>`}${issues.length ? `<span class="pill err">🔧 ${t('issues_n', { n: issues.length })}</span>` : ''}</div>
+    <div class="present">
+      ${here.length ? `<div class="present-now">🟢 <b>${t('playing_now')}:</b> ${here.slice(0, 8).map((x) => { const pp = profileById(x.player_id); const tt = pp?.team_id ? teamById(pp.team_id) : null; return `<a class="chip in" href="#/player/${esc(x.player_id)}">${tt ? esc(tt.tag) + ' · ' : ''}${esc(pp?.nick || '?')}</a>`; }).join('')}${here.length > 8 ? ` +${here.length - 8}` : ''}</div>` : `<div class="small muted">${t('nobody_here')}</div>`}
+      ${store.me ? (iAmPresent(c.id) ? `<span class="pill ok">📍 ${t('you_are_here')}</span>` : `<button class="btn ${near || fake ? 'primary' : ''}" data-act="presence" ${near || fake ? '' : 'disabled'}>📍 ${t('check_in_here')} <span class="coin">+5</span></button>`) : ''}
+    </div>
     <div class="row quick">
       <button class="btn primary" data-act="game-new">🤝 ${t('g_create')}</button>
       <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}">🧭 ${t('navigate')}</a>
@@ -365,6 +372,10 @@ const sheetHandlers = {
   ...gameHandlers,
   close: closeSheet,
   'game-new': () => openCreateGame(openCourtId),
+  async presence() {
+    const p = await currentPos();
+    await act('check_in_court', { p_court: openCourtId, p_lat: p?.lat ?? null, p_lng: p?.lng ?? null }, 'ok_presence');
+  },
   'og-edit': () => openReviewEditor(openCourtId),
   'issue-ok': (d) => act('resolve_issue', { p_id: Number(d.id) || d.id }, 'ok_saved'),
   issue() {
@@ -400,11 +411,11 @@ const sheetHandlers = {
   },
   async claim() {
     const p = await currentPos();
-    await act('claim_court', { p_court: openCourtId, p_lat: p?.lat ?? null, p_lng: p?.lng ?? null }, 'ok_claimed');
+    await act('claim_court', { p_court: openCourtId, p_lat: p?.lat ?? null, p_lng: p?.lng ?? null }, 'ok_claim_sent');
   },
   challenge() {
     const c = courtById(openCourtId);
-    const def = now() + 24 * 3600e3;
+    const def = now() + 72 * 3600e3;
     modal(`<h3>⚔️ ${t('challenge_king')}</h3>
       <p class="muted">${esc(courtName(c))} · ${teamTag(teamById(c.king_team_id))}</p>
       <label>${t('match_time')}<input type="datetime-local" id="ch-time" value="${localInputValue(def)}"></label>
