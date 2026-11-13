@@ -10,13 +10,14 @@ import { renderMatches, pendingActionsCount } from './views/matches.js';
 import { renderAdmin } from './views/admin.js';
 import { renderAuth } from './views/auth.js';
 import { renderTable } from './views/table.js';
+import { renderHome, renderHow } from './views/home.js';
 
 const $ = (id) => document.getElementById(id);
 let lastFocus = null;
 
 function route() {
-  const [name, param] = (location.hash.replace(/^#\/?/, '') || 'map').split('/');
-  return { name: name || 'map', param };
+  const [name, param] = (location.hash.replace(/^#\/?/, '') || 'home').split('/');
+  return { name: name || 'home', param };
 }
 
 function renderChrome() {
@@ -37,15 +38,15 @@ function renderChrome() {
   const r = route().name;
   const badge = pendingActionsCount();
   const items = [
+    ['home', '🏠', t('nav_home'), 0, 'home'],
     ['map', '🗺️', t('nav_map')],
+    ['matches', '⚔️', t('nav_matches'), badge],
     ['table', '📊', t('nav_table')],
     ['teams', '🛡️', t('nav_teams')],
-    ['matches', '⚔️', t('nav_matches'), badge],
-    ['player', '👤', t('nav_profile'), 0, 'player/me'],
     ...(isStaff() ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => c.status === 'reported').length]] : []),
   ];
   $('nav').innerHTML = items.map(([key, ic, label, n, href]) => {
-    const on = r === key || (key === 'teams' && r === 'team');
+    const on = r === key || (key === 'teams' && (r === 'team' || r === 'player')) || (key === 'home' && r === 'how');
     return `<a href="#/${href || key}" class="${on ? 'on' : ''}"><span class="ic">${ic}${n ? `<i class="dot">${n}</i>` : ''}</span><span>${label}</span></a>`;
   }).join('');
 }
@@ -67,14 +68,16 @@ function render() {
   $('map-view').hidden = true;
   page.hidden = false;
   switch (r.name) {
+    case 'home': return renderHome(page);
+    case 'how': return renderHow(page);
     case 'table': return renderTable(page);
     case 'teams': return renderTeams(page);
     case 'team': return renderTeam(page, r.param);
     case 'player': return renderPlayer(page, r.param || 'me');
     case 'matches': return renderMatches(page);
     case 'admin': return renderAdmin(page);
-    case 'login': return renderAuth(page);
-    default: location.hash = '#/map';
+    case 'login': return renderAuth(page, r.param);
+    default: location.hash = '#/home';
   }
 }
 

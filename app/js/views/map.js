@@ -2,13 +2,13 @@
 import { CONFIG } from '../config.js';
 import { api } from '../api/index.js';
 import { t } from '../i18n.js';
-import { RULES, SPORTS, SPORT_ICON, distM } from '../rules.js';
+import { RULES, SPORTS, SPORT_ICON, COURT_CRITERIA, distM } from '../rules.js';
 import { geo, currentPos } from '../geo.js';
 import { fetchArea, googleSatelliteUrl } from '../courts-import.js';
 import { esc, bind, modal, toast, fmtDate, fmtDay, fmtLeft, fmtDist, teamTag, localInputValue, confirmBox } from '../ui.js';
 import {
   store, act, reload, now, T, teamById, myTeam, isCaptainOf, isAdmin, openChallengeForCourt, courtName, courtHistory,
-  courtById, errText, ui, setSport, sportOk, zones, standings, lastCapture, rerender,
+  courtById, errText, ui, setSport, sportOk, zones, standings, lastCapture, rerender, courtRating, myCourtRating, profileById,
 } from '../state.js';
 
 let map, markers, zoneLayer, meMarker, meCircle, layers = {}, curLayer = null;
@@ -58,7 +58,12 @@ export function initMap() {
   }
 
   zoneLayer = L.layerGroup().addTo(map);
-  markers = L.layerGroup().addTo(map);
+  // grupowanie pinezek, gdy boisk jest dużo (liczba w kółku → przybliż)
+  markers = L.markerClusterGroup
+    ? L.markerClusterGroup({ maxClusterRadius: 45, disableClusteringAtZoom: 15, showCoverageOnHover: false,
+      iconCreateFunction: (cl) => L.divIcon({ className: '', html: `<div class="cluster">${cl.getChildCount()}</div>`, iconSize: [40, 40] }) })
+    : L.layerGroup();
+  markers.addTo(map);
   map.on('dragstart zoomstart', () => (userMoved = true));
   map.on('moveend', scheduleImport);
 
@@ -119,6 +124,8 @@ function updateMe(p) {
   }
   if (openCourtId) renderSheet();
 }
+
+export const getMapBounds = () => (map ? map.getBounds() : null);
 
 export function showMap() {
   if (map) setTimeout(() => map.invalidateSize(), 50);
@@ -281,6 +288,7 @@ function renderSheet() {
     <div class="small muted">${t('sport_' + c.sport)} · ${esc(c.address || '')}${d != null ? ` · ${fmtDist(d)} ${t('from_you')}` : ''} · <span class="src">${esc(c.source)}</span></div>
     ${kingHtml}
     <div class="sheet-actions">${actions}</div>
+    ${ratingBlock(c)}
     <div class="row">
       <a class="btn ghost small" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}">🧭 ${t('navigate')}</a>
       ${isAdmin() ? `<button class="btn ghost small" data-act="reset">♻️ ${t('admin_reset_court')}</button>
@@ -290,8 +298,52 @@ function renderSheet() {
   el.hidden = false;
 }
 
+export const stars = (v) => {
+  if (v == null) return '<span class="stars muted">☆☆☆☆☆</span>';
+  const full = Math.round(v);
+  return `<span class="stars">${'★'.repeat(full)}<span class="off">${'★'.repeat(5 - full)}</span></span>`;
+};
+
+function ratingBlock(c) {
+  const r = courtRating(c.id);
+  const mine = myCourtRating(c.id);
+  const comments = r.rows.filter((x) => x.comment).slice(0, 3);
+  return `<div class="rating-box">
+    <div class="rating-head">
+      <div><span class="rating-big">${r.avg != null ? r.avg.toFixed(1) : '–'}</span> ${stars(r.avg)}
+        <div class="small muted">${r.n ? t('ratings_count', { n: r.n }) : t('no_ratings')}</div></div>
+      ${store.me ? `<button class="btn small ${mine ? 'ghost' : 'primary'}" data-act="rate">⭐ ${mine ? t('change_rating') : t('rate_court')}</button>` : ''}
+    </div>
+    ${r.n ? `<div class="crit">${COURT_CRITERIA.map((k) => `<div class="crit-row"><span>${t('cr_' + k)}</span>${stars(r.by[k])}<b>${r.by[k] != null ? r.by[k].toFixed(1) : '–'}</b></div>`).join('')}</div>` : ''}
+    ${comments.map((x) => `<div class="rcomment">„${esc(x.comment)}” <span class="muted small">– ${esc(profileById(x.player_id)?.nick || '?')}</span></div>`).join('')}
+  </div>`;
+}
+
 const sheetHandlers = {
   close: closeSheet,
+  rate() {
+    const c = courtById(openCourtId);
+    const mine = myCourtRating(c.id);
+    const vals = { ...(mine?.scores || {}) };
+    modal(`<h3>⭐ ${t('rate_court')}</h3>
+      <p class="muted">${SPORT_ICON[c.sport]} ${esc(courtName(c))}</p>
+      <p class="small muted">${t('rate_hint')}</p>
+      ${COURT_CRITERIA.map((k) => `<div class="rate-row"><div><b>${t('cr_' + k)}</b><div class="small muted">${t('crh_' + k)}</div></div>
+        <div class="star-pick" data-k="${k}">${[1, 2, 3, 4, 5].map((n) => `<button data-n="${n}" class="${(vals[k] || 0) >= n ? 'on' : ''}">★</button>`).join('')}</div></div>`).join('')}
+      <label>${t('rate_comment')}<input id="rc" maxlength="280" value="${esc(mine?.comment || '')}" placeholder="${t('rate_comment_ph')}"></label>
+      <div class="row end"><button class="btn ghost" data-close>${t('cancel')}</button><button class="btn primary" id="ok">${t('save')}</button></div>`,
+    (m, close) => {
+      m.querySelectorAll('.star-pick').forEach((box) => box.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+        vals[box.dataset.k] = Number(b.dataset.n);
+        box.querySelectorAll('button').forEach((x) => x.classList.toggle('on', Number(x.dataset.n) <= vals[box.dataset.k]));
+      })));
+      m.querySelector('#ok').onclick = async () => {
+        if (COURT_CRITERIA.some((k) => !vals[k])) return toast(t('rate_all'), 'err');
+        const scores = Object.fromEntries(COURT_CRITERIA.map((k) => [k, vals[k]]));
+        if (await act('rate_court', { p_court: c.id, p_scores: scores, p_comment: m.querySelector('#rc').value }, 'ok_rated')) close();
+      };
+    });
+  },
   async claim() {
     const p = await currentPos();
     await act('claim_court', { p_court: openCourtId, p_lat: p?.lat ?? null, p_lng: p?.lng ?? null }, 'ok_claimed');

@@ -7,10 +7,15 @@ export async function create(cfg) {
   let changeCb = null;
   sb.auth.onAuthStateChange((_e, s) => { session = s; changeCb && changeCb(); });
 
-  async function all(table) {
-    const { data, error } = await sb.from(table).select('*');
-    if (error) throw new Error(error.message);
-    return data;
+  // pobiera całą tabelę partiami po 1000 wierszy (limit Supabase)
+  async function all(table, optional = false) {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from(table).select('*').range(from, from + 999);
+      if (error) { if (optional) return out; throw new Error(error.message); }
+      out.push(...data);
+      if (data.length < 1000) return out;
+    }
   }
 
   return {
@@ -18,9 +23,11 @@ export async function create(cfg) {
     now: () => Date.now(),
     canImport: () => !!session,
     async load() {
-      const [teams, profiles, courts, challenges, challenge_players, court_history] = await Promise.all(
-        ['teams', 'profiles', 'courts', 'challenges', 'challenge_players', 'court_history'].map(all));
-      return { teams, profiles, courts, challenges, challenge_players, court_history };
+      const [teams, profiles, courts, challenges, challenge_players, court_history, court_ratings] = await Promise.all([
+        all('teams'), all('profiles'), all('courts'), all('challenges'), all('challenge_players'), all('court_history'),
+        all('court_ratings', true), // tabela z migracji 2 – brak nie psuje aplikacji
+      ]);
+      return { teams, profiles, courts, challenges, challenge_players, court_history, court_ratings };
     },
     async me(data) {
       if (!session) return null;

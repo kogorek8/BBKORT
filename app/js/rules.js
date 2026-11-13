@@ -32,3 +32,7 @@ export function distM(lat1, lng1, lat2, lng2) {
     Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lng2 - lng1) / 2) ** 2;
   return 2 * 6371000 * Math.asin(Math.sqrt(a));
 }
+
+// OCENA BOISKA – kryteria (gwiazdki 1–5). Tymczasowe – podmień na reguły z planu BBKORT.
+// Klucz = nazwa w bazie, tekst = i18n "cr_<klucz>". Można dodawać/usuwać bez zmian w bazie.
+export const COURT_CRITERIA = ['surface', 'hoops', 'lighting', 'access', 'vibe'];

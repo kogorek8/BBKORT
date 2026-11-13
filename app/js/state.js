@@ -2,7 +2,7 @@
 import { api } from './api/index.js';
 import { t, has } from './i18n.js';
 import { toast } from './ui.js';
-import { OPEN_STATUSES, WIN_STATUSES, ZONE_LAT, ZONE_LNG } from './rules.js';
+import { OPEN_STATUSES, WIN_STATUSES, ZONE_LAT, ZONE_LNG, COURT_CRITERIA } from './rules.js';
 import { teamRating } from './skills.js';
 
 export const store = { data: null, me: null };
@@ -137,3 +137,18 @@ export function teamRecord(tid) {
 export const teamChallenges = (tid) => store.data.challenges
   .filter((c) => c.challenger_team_id === tid || c.defender_team_id === tid)
   .sort((a, b) => T(b.scheduled_at) - T(a.scheduled_at));
+
+// ---- OCENY BOISK: średnia ogólna + średnie kryteriów
+export function courtRating(cid) {
+  const rows = (store.data.court_ratings || []).filter((r) => r.court_id === cid);
+  if (!rows.length) return { n: 0, avg: null, by: {}, rows };
+  const by = {};
+  for (const k of COURT_CRITERIA) {
+    const v = rows.map((r) => Number(r.scores?.[k])).filter((x) => x >= 1 && x <= 5);
+    by[k] = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  }
+  const parts = Object.values(by).filter((x) => x != null);
+  const avg = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
+  return { n: rows.length, avg, by, rows: rows.sort((a, b) => T(b.created_at) - T(a.created_at)) };
+}
+export const myCourtRating = (cid) => (store.me ? (store.data.court_ratings || []).find((r) => r.court_id === cid && r.player_id === store.me.id) : null);

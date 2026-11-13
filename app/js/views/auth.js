@@ -6,12 +6,13 @@ import { store, reload, errText } from '../state.js';
 
 let mode = 'login';
 
-export function renderAuth(root) {
+export function renderAuth(root, m) {
+  if (m === 'register' || m === 'login') mode = m;
   if (api.mode === 'demo') return renderDemoUsers(root);
   if (store.me) {
     root.innerHTML = `<div class="auth"><h1>${t('account')}</h1><p>${t('logged_as')} <b>${esc(store.me.nick)}</b></p>
       <a class="btn" href="#/player/me">${t('nav_profile')}</a> <button class="btn ghost" data-act="out">${t('logout')}</button></div>`;
-    bind(root, { out: async () => { await api.signOut(); await reload(); location.hash = '#/map'; } });
+    bind(root, { out: async () => { await api.signOut(); await reload(); location.hash = '#/home'; } });
     return;
   }
   root.innerHTML = `<div class="auth">
@@ -44,7 +45,7 @@ export function renderAuth(root) {
         if (r.needsConfirm) { toast(t('check_email'), 'ok'); return; }
       }
       await reload();
-      location.hash = '#/map';
+      location.hash = '#/home';
     } catch (err) { toast(errText(err), 'err'); }
   };
 }
@@ -58,5 +59,5 @@ function renderDemoUsers(root) {
     <div class="ulist">${users.map((u) => `<button class="uitem ${u.id === cur ? 'on' : ''}" data-act="as" data-id="${esc(u.id)}">
       ${u.sport === 'football' ? '⚽' : '🏀'} <b>${esc(u.nick)}</b> <span class="small muted">${u.team ? esc(u.team) : t('free_agent')}${u.captain ? ' · ' + t('captain') : ''}${u.admin ? ' · admin' : ''}${u.moderator ? ' · 🧑‍⚖️ ' + t('moderator') : ''}</span></button>`).join('')}</div>
   </div>`;
-  bind(root, { as: (d) => { api.demo.switchUser(d.id); toast(t('switched_user'), 'ok'); } });
+  bind(root, { as: (d) => { api.demo.switchUser(d.id); toast(t('switched_user'), 'ok'); location.hash = '#/home'; } });
 }

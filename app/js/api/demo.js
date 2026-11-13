@@ -5,7 +5,7 @@
 import { RULES, OPEN_STATUSES, SPORTS, distM, H, M } from '../rules.js';
 import { skillKeys } from '../skills.js';
 
-const KEY = 'bbkort_demo_v2';
+const KEY = 'bbkort_demo_v3';
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const err = (code) => new Error(code);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -114,16 +114,26 @@ function seed() {
     ['c7', 'f1', 'claim', null, 8], ['c8', 'f2', 'claim', null, 4],
   ].map(([court_id, team_id, event, challenge_id, d], i) => ({ id: i + 1, court_id, team_id, event, challenge_id, at: iso(now - d * day) }));
 
+  const R5 = (o) => o;
+  const court_ratings = [
+    ['c1', 'u1', { surface: 4, hoops: 5, lighting: 3, access: 4, vibe: 5 }, 'Najlepsze kosze w okolicy, wieczorem tłoczno.'],
+    ['c1', 'u4', { surface: 4, hoops: 4, lighting: 2, access: 3, vibe: 5 }, 'Słabe światło po 20:00.'],
+    ['c2', 'u7', { surface: 3, hoops: 3, lighting: 4, access: 5, vibe: 4 }, null],
+    ['c3', 'u9', { surface: 5, hoops: 5, lighting: 5, access: 3, vibe: 4 }, 'Orlik zamykany o 22.'],
+    ['c7', 'u23', { surface: 4, hoops: 5, lighting: 5, access: 2, vibe: 4 }, 'Trzeba rezerwować u gospodarza.'],
+    ['c5', 'u2', { surface: 2, hoops: 3, lighting: 1, access: 5, vibe: 5 }, 'Super klimat nad Wisłą, ale nierówny asfalt.'],
+  ].map(([court_id, player_id, scores, comment], i) => R5({ court_id, player_id, scores, comment, created_at: iso(now - (i + 1) * day) }));
+
   return {
-    version: 2, time_offset: 0, fake_gps: true, current_user: 'admin',
-    teams, profiles, courts, challenges, challenge_players, court_history,
+    version: 3, time_offset: 0, fake_gps: true, current_user: 'admin',
+    teams, profiles, courts, challenges, challenge_players, court_history, court_ratings,
   };
 }
 
 export function create() {
   let S;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch { S = null; }
-  if (!S || S.version !== 2) S = seed();
+  if (!S || S.version !== 3) S = seed();
 
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* ignore */ } };
   const now = () => Date.now() + S.time_offset;
@@ -390,6 +400,19 @@ export function create() {
       }
       return n;
     },
+    // ---- oceny boisk
+    rate_court({ p_court, p_scores, p_comment }) {
+      const p = me();
+      getCourt(p_court);
+      const vals = Object.values(p_scores || {});
+      if (!vals.length || vals.length > 12 || vals.some((v) => !Number.isInteger(v) || v < 1 || v > 5)) throw err('err_bad_rating');
+      S.court_ratings = S.court_ratings.filter((r) => !(r.court_id === p_court && r.player_id === p.id));
+      S.court_ratings.push({ court_id: p_court, player_id: p.id, scores: p_scores, comment: (p_comment || '').trim().slice(0, 280) || null, created_at: iso(now()) });
+    },
+    admin_delete_rating({ p_court, p_player }) {
+      admin();
+      S.court_ratings = S.court_ratings.filter((r) => !(r.court_id === p_court && r.player_id === p_player));
+    },
     // ---- admin
     admin_set_moderator({ p_player, p_on }) {
       admin();
@@ -408,6 +431,7 @@ export function create() {
       const dead = new Set(S.challenges.filter((c) => c.court_id === p_court).map((c) => c.id));
       S.challenges = S.challenges.filter((c) => !dead.has(c.id));
       S.court_history = S.court_history.filter((h) => h.court_id !== p_court);
+      S.court_ratings = S.court_ratings.filter((r) => r.court_id !== p_court);
     },
   };
 
@@ -418,8 +442,8 @@ export function create() {
     now,
     canImport: () => true,
     async load() {
-      const { teams, profiles, courts, challenges, challenge_players, court_history } = S;
-      return clone({ teams, profiles, courts, challenges, challenge_players, court_history });
+      const { teams, profiles, courts, challenges, challenge_players, court_history, court_ratings } = S;
+      return clone({ teams, profiles, courts, challenges, challenge_players, court_history, court_ratings: court_ratings || [] });
     },
     async me(data) { return data.profiles.find((p) => p.id === S.current_user) || null; },
     async rpc(name, args) {

@@ -4,11 +4,15 @@ import { t } from '../i18n.js';
 import { H } from '../rules.js';
 import { ovr, tier, skillsOf } from '../skills.js';
 import { esc, bind, teamTag, fmtDate, fmtLeft, confirmBox } from '../ui.js';
-import { store, act, teamById, isAdmin, isStaff, teamChallenges, now, T } from '../state.js';
+import { store, act, reload, teamById, isAdmin, isStaff, teamChallenges, now, T, errText } from '../state.js';
+import { CITY_PRESETS, tiles, fetchArea } from '../courts-import.js';
+import { getMapBounds } from './map.js';
+import { SPORT_ICON } from '../rules.js';
+import { toast } from '../ui.js';
 import { skillBars } from './player.js';
 import { challengeCard, challengeHandlers } from './matches.js';
 
-let tab = 'results', q = '';
+let tab = 'results', q = '', importing = false;
 
 const recentLine = (p) => {
   if (!p.team_id) return `<span class="muted">${t('free_agent')}</span>`;
@@ -65,6 +69,43 @@ function modsTab() {
     </div>`).join('') || `<p class="muted small">${t('type_to_search')}</p>`}</div>`;
 }
 
+function courtsTab() {
+  const n = (sp) => store.data.courts.filter((c) => c.sport === sp).length;
+  return `<p class="small muted">${t('import_hint')}</p>
+    <div class="stats">
+      <div class="stat"><b>${n('basketball')}</b><span>${SPORT_ICON.basketball} ${t('sport_basketball')}</span></div>
+      <div class="stat"><b>${n('football')}</b><span>${SPORT_ICON.football} ${t('sport_football')}</span></div>
+    </div>
+    <div class="review">
+      <b>${t('import_city')}</b>
+      <select id="city">${Object.keys(CITY_PRESETS).map((c) => `<option>${esc(c)}</option>`).join('')}</select>
+      <div class="row"><button class="btn primary" data-act="import-city" ${importing ? 'disabled' : ''}>⬇️ ${t('import_go')}</button>
+        <button class="btn" data-act="import-view" ${importing ? 'disabled' : ''}>🗺️ ${t('import_view')}</button></div>
+      <div id="imp-status" class="small"></div>
+    </div>`;
+}
+
+async function runImport(root, box, label) {
+  if (importing) return;
+  importing = true;
+  const status = () => root.querySelector('#imp-status');
+  const parts = tiles(box);
+  let found = 0, added = 0, failed = 0;
+  root.querySelectorAll('[data-act^=import]').forEach((b) => (b.disabled = true));
+  for (let i = 0; i < parts.length; i++) {
+    if (status()) status().textContent = `${label}: ${t('import_progress', { i: i + 1, n: parts.length, f: found, a: added })}`;
+    try {
+      const list = await fetchArea(parts[i]);
+      found += list.length;
+      for (let j = 0; j < list.length; j += 250) added += (await api.rpc('import_courts', { p_courts: list.slice(j, j + 250) })) || 0;
+    } catch (e) { failed++; console.warn(e); }
+    await new Promise((r) => setTimeout(r, 800)); // nie przeciążamy serwera OSM
+  }
+  importing = false;
+  toast(t('import_done', { a: added, f: found }) + (failed ? ` · ${t('import_failed', { n: failed })}` : ''), failed && !found ? 'err' : 'ok');
+  await reload();
+}
+
 function demoTab() {
   return `<div class="review">
     <p class="small muted">${t('demo_tools_hint')}</p>
@@ -80,9 +121,9 @@ function demoTab() {
 export function renderAdmin(root) {
   if (!isStaff()) { root.innerHTML = `<p class="muted">${t('err_not_staff')}</p>`; return; }
   const tabs = [['results', '📝 ' + t('tab_results')], ['skills', '⏳ ' + t('tab_skills')],
-    ...(isAdmin() ? [['mods', '🧑‍⚖️ ' + t('tab_mods')]] : []), ...(api.mode === 'demo' ? [['demo', '🧪 Demo']] : [])];
+    ...(isAdmin() ? [['courts', '📍 ' + t('tab_courts')], ['mods', '🧑‍⚖️ ' + t('tab_mods')]] : []), ...(api.mode === 'demo' ? [['demo', '🧪 Demo']] : [])];
   if (!tabs.some(([k]) => k === tab)) tab = 'results';
-  const body = { results: resultsTab, skills: skillsTab, mods: modsTab, demo: demoTab }[tab]();
+  const body = { results: resultsTab, skills: skillsTab, courts: courtsTab, mods: modsTab, demo: demoTab }[tab]();
 
   root.innerHTML = `
     <div class="page-head"><h1>🛠️ ${t('nav_admin')}</h1><span class="muted small">${isAdmin() ? 'Admin' : t('moderator')}</span></div>
@@ -101,6 +142,14 @@ export function renderAdmin(root) {
     reject: (d) => act('review_skills', { p_player: d.id, p_approve: false, p_note: note(d.id) }, 'ok_rejected'),
     mod: (d) => act('admin_set_moderator', { p_player: d.id, p_on: d.on === '1' }, 'ok_saved'),
     shift: (d) => api.demo.shiftTime(Number(d.h) * H),
+    'import-city': () => { const c = root.querySelector('#city').value; runImport(root, CITY_PRESETS[c], c); },
+    'import-view': () => {
+      const b = getMapBounds();
+      if (!b) return toast(t('import_open_map'), 'err');
+      const area = (b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest());
+      if (area > 1.5) return toast(t('import_too_big'), 'err');
+      runImport(root, [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()], t('import_view'));
+    },
     reset: async () => { if (await confirmBox(t('demo_reset') + '?')) api.demo.reset(); },
   });
 }
