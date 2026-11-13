@@ -5,8 +5,8 @@
 // =====================================================================
 export const CONFIG = {
   // Supabase → Project Settings → API
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: '',
+  SUPABASE_URL: 'https://rclgostlltwzscmmgtdf.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_yQoymNXEHOkRvNdnecHk6g_i8PEWAh2', // klucz publiczny (publishable) – może być w przeglądarce
 
   // Google Maps Platform (opcjonalnie): satelita Google + wyszukiwanie boisk w Google.
   // Bez klucza: satelita Esri + boiska z OpenStreetMap (za darmo).
