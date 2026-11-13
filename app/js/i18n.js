@@ -465,7 +465,7 @@ const pl = {
   land_games_title: "Najbliższe gry – dołącz",
   how_intro: "BBKORT pokazuje, gdzie i z kim pograć, a drużynom daje prawdziwą rywalizację o boiska.",
   how1_t: "Znajdź dobre boisko",
-  how1_d: "Na mapie są boiska do kosza i piłki. Te ze znakiem ★ OG SPOT sprawdziliśmy osobiście: pomiary, test piłki, gra.",
+  how1_d: "Na mapie są boiska sportowe w Twojej okolicy. Te ze znakiem ★ OG SPOT sprawdziliśmy osobiście: pomiary, test piłki, gra.",
   how2_t: "Dołącz do gry",
   how2_d: "W „Gramy?” widzisz otwarte gry. Stuknij „Dołączam” albo umów własną na wybranym boisku.",
   how3_t: "Załóż profil i drużynę",
@@ -802,7 +802,7 @@ const pl = {
   file_import_none: "Nie znaleziono żadnych współrzędnych",
   land_title: "OG SPOT",
   land_tag: "BRINGING PLAYERS TOGETHER",
-  land_sub: "Mapa boisk do koszykówki i piłki nożnej, na której widać, kto teraz gra i do jakiej gry możesz dołączyć. Załóż profil i drużynę, wyzywaj inne ekipy o boiska i zbieraj OG Coins na nagrody.",
+  land_sub: "Mapa boisk sportowych, na której widać, kto teraz gra i do jakiej gry możesz dołączyć. Załóż profil i drużynę, wyzywaj inne ekipy o boiska i zbieraj OG Coins na nagrody.",
 };
 
 const en = {
@@ -1265,7 +1265,7 @@ const en = {
   land_games_title: "Upcoming games – join in",
   how_intro: "BBKORT shows where and with whom to play, and gives teams real competition for courts.",
   how1_t: "Find a good court",
-  how1_d: "The map shows basketball and football courts. Those marked ★ OG SPOT we tested in person: measurements, ball test, play.",
+  how1_d: "The map shows sports courts near you. Those marked ★ OG SPOT we tested in person: measurements, ball test, play.",
   how2_t: "Join a game",
   how2_d: "“Let's play” lists open games. Tap “I'm in” or set up your own at any court.",
   how3_t: "Create a profile and team",
@@ -1602,7 +1602,7 @@ const en = {
   file_import_none: "No coordinates found",
   land_title: "OG SPOT",
   land_tag: "BRINGING PLAYERS TOGETHER",
-  land_sub: "A map of basketball and football courts that shows who's playing right now and which games you can join. Create a profile and a team, challenge other crews for courts and collect OG Coins for rewards.",
+  land_sub: "A map of sports courts that shows who's playing right now and which games you can join. Create a profile and a team, challenge other crews for courts and collect OG Coins for rewards.",
 };
 
 const DICT = { pl, en };
