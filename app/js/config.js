@@ -11,7 +11,14 @@ export const CONFIG = {
   // Google Maps Platform (opcjonalnie): satelita Google + wyszukiwanie boisk w Google.
   // Bez klucza: satelita Esri + boiska z OpenStreetMap (za darmo).
   GOOGLE_MAPS_API_KEY: '',
-  GOOGLE_QUERY: 'boisko do koszykówki',
+  GOOGLE_QUERIES: { basketball: 'boisko do koszykówki', football: 'boisko piłkarskie orlik' },
+
+  // Mapa satelitarna (kolejność przycisku 🛰️). Domyślnie: darmowa ortofotomapa
+  // Geoportalu (Polska, bardzo dokładna) + Esri poza Polską.
+  //  - Mapbox: wpisz token (darmowy limit na mapbox.com) → pojawi się warstwa "Mapbox Satellite"
+  //  - MapTiler: wpisz klucz (darmowy plan na maptiler.com) → warstwa "MapTiler Satellite"
+  MAPBOX_TOKEN: '',
+  MAPTILER_KEY: '',
 
   // Start mapy, zanim telefon poda lokalizację (Warszawa)
   DEFAULT_CENTER: [52.2297, 21.0122],

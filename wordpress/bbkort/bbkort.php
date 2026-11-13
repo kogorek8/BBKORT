@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) exit;
 /**
  * [bbkort]                       – aplikacja na całą wysokość ekranu
  * [bbkort height="700px"]        – własna wysokość
- * [bbkort view="teams"]          – start na wybranej zakładce (map | teams | matches)
+ * [bbkort view="table"]          – start na wybranej zakładce (map | table | teams | matches)
  */
 function bbkort_shortcode($atts) {
     $a = shortcode_atts(array(

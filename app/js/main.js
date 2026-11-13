@@ -1,6 +1,6 @@
 import { initApi, api } from './api/index.js';
 import { t, getLang, setLang } from './i18n.js';
-import { store, onRender, reload, softReload, myTeam, errText } from './state.js';
+import { store, onRender, reload, softReload, myTeam, errText, isStaff } from './state.js';
 import { startGeo } from './geo.js';
 import { esc, teamTag } from './ui.js';
 import { initMap, refreshMap, showMap, focusCourt } from './views/map.js';
@@ -9,6 +9,7 @@ import { renderPlayer } from './views/player.js';
 import { renderMatches, pendingActionsCount } from './views/matches.js';
 import { renderAdmin } from './views/admin.js';
 import { renderAuth } from './views/auth.js';
+import { renderTable } from './views/table.js';
 
 const $ = (id) => document.getElementById(id);
 let lastFocus = null;
@@ -37,10 +38,11 @@ function renderChrome() {
   const badge = pendingActionsCount();
   const items = [
     ['map', '🗺️', t('nav_map')],
+    ['table', '📊', t('nav_table')],
     ['teams', '🛡️', t('nav_teams')],
     ['matches', '⚔️', t('nav_matches'), badge],
     ['player', '👤', t('nav_profile'), 0, 'player/me'],
-    ...(me?.is_admin ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => c.status === 'disputed').length]] : []),
+    ...(isStaff() ? [['admin', '🛠️', t('nav_admin'), store.data.profiles.filter((p) => p.skills_status === 'pending').length + store.data.challenges.filter((c) => c.status === 'reported').length]] : []),
   ];
   $('nav').innerHTML = items.map(([key, ic, label, n, href]) => {
     const on = r === key || (key === 'teams' && r === 'team');
@@ -65,6 +67,7 @@ function render() {
   $('map-view').hidden = true;
   page.hidden = false;
   switch (r.name) {
+    case 'table': return renderTable(page);
     case 'teams': return renderTeams(page);
     case 'team': return renderTeam(page, r.param);
     case 'player': return renderPlayer(page, r.param || 'me');

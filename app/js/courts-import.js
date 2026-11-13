@@ -1,12 +1,13 @@
-// Automatyczne wyszukiwanie boisk do koszykówki:
+// Automatyczne wyszukiwanie boisk (koszykówka + piłka nożna):
 //  - OpenStreetMap (Overpass API) – darmowe, zawsze włączone
 //  - Google Places – tylko gdy ustawiono GOOGLE_MAPS_API_KEY
 import { CONFIG } from './config.js';
 
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
+const OSM_SPORT = { basketball: 'basketball', soccer: 'football' };
 
 export async function fetchOSM(b) {
-  const q = `[out:json][timeout:25];(nwr["leisure"="pitch"]["sport"~"basketball"](${b.s},${b.w},${b.n},${b.e}););out center tags 300;`;
+  const q = `[out:json][timeout:25];(nwr["leisure"="pitch"]["sport"~"basketball|soccer"](${b.s},${b.w},${b.n},${b.e}););out center tags 400;`;
   const r = await fetch(OVERPASS, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -14,14 +15,22 @@ export async function fetchOSM(b) {
   });
   if (!r.ok) throw new Error('overpass ' + r.status);
   const j = await r.json();
-  return (j.elements || []).map((el) => {
+  const out = [];
+  for (const el of j.elements || []) {
     const lat = el.lat ?? el.center?.lat;
     const lng = el.lon ?? el.center?.lon;
-    if (lat == null || lng == null) return null;
+    if (lat == null || lng == null) continue;
     const tg = el.tags || {};
     const address = [tg['addr:street'], tg['addr:housenumber']].filter(Boolean).join(' ') || tg['addr:city'] || '';
-    return { external_id: `osm:${el.type}/${el.id}`, name: tg.name || '', lat, lng, address, source: 'osm' };
-  }).filter(Boolean);
+    // boisko wielofunkcyjne (np. "basketball;soccer") → osobne boisko dla każdego sportu
+    const sports = [...new Set((tg.sport || '').split(';').map((s) => OSM_SPORT[s.trim()]).filter(Boolean))];
+    sports.forEach((sport, i) => out.push({
+      external_id: `osm:${el.type}/${el.id}:${sport}`, name: tg.name || '', sport,
+      // lekkie przesunięcie, żeby pinezki dwóch sportów nie nachodziły na siebie
+      lat: lat + i * 0.00012, lng, address, source: 'osm',
+    }));
+  }
+  return out;
 }
 
 let googleReady = null;
@@ -43,16 +52,20 @@ export function loadGoogle() {
 export async function fetchGoogle(b) {
   await loadGoogle();
   const { Place } = await google.maps.importLibrary('places');
-  const { places } = await Place.searchByText({
-    textQuery: CONFIG.GOOGLE_QUERY,
-    fields: ['id', 'displayName', 'location', 'formattedAddress'],
-    locationRestriction: { north: b.n, south: b.s, east: b.e, west: b.w },
-    maxResultCount: 20,
-  });
-  return (places || []).map((p) => ({
-    external_id: 'g:' + p.id, name: p.displayName || '', lat: p.location.lat(), lng: p.location.lng(),
-    address: p.formattedAddress || '', source: 'google',
-  }));
+  const out = [];
+  for (const [sport, textQuery] of Object.entries(CONFIG.GOOGLE_QUERIES)) {
+    const { places } = await Place.searchByText({
+      textQuery,
+      fields: ['id', 'displayName', 'location', 'formattedAddress'],
+      locationRestriction: { north: b.n, south: b.s, east: b.e, west: b.w },
+      maxResultCount: 20,
+    });
+    for (const p of places || []) out.push({
+      external_id: `g:${p.id}:${sport}`, name: p.displayName || '', sport,
+      lat: p.location.lat(), lng: p.location.lng(), address: p.formattedAddress || '', source: 'google',
+    });
+  }
+  return out;
 }
 
 // Google Map Tiles API – oficjalne kafelki satelitarne Google (wymaga klucza)

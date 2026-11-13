@@ -56,7 +56,7 @@ function renderDemoUsers(root) {
     <h1>🧪 ${t('demo_mode')}</h1>
     <p class="muted small">${t('demo_users_hint')}</p>
     <div class="ulist">${users.map((u) => `<button class="uitem ${u.id === cur ? 'on' : ''}" data-act="as" data-id="${esc(u.id)}">
-      <b>${esc(u.nick)}</b> <span class="small muted">${u.team ? esc(u.team) : t('free_agent')}${u.captain ? ' · ' + t('captain') : ''}${u.admin ? ' · admin' : ''}</span></button>`).join('')}</div>
+      ${u.sport === 'football' ? '⚽' : '🏀'} <b>${esc(u.nick)}</b> <span class="small muted">${u.team ? esc(u.team) : t('free_agent')}${u.captain ? ' · ' + t('captain') : ''}${u.admin ? ' · admin' : ''}${u.moderator ? ' · 🧑‍⚖️ ' + t('moderator') : ''}</span></button>`).join('')}</div>
   </div>`;
   bind(root, { as: (d) => { api.demo.switchUser(d.id); toast(t('switched_user'), 'ok'); } });
 }

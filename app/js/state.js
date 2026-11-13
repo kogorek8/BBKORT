@@ -2,7 +2,8 @@
 import { api } from './api/index.js';
 import { t, has } from './i18n.js';
 import { toast } from './ui.js';
-import { OPEN_STATUSES, WIN_STATUSES } from './rules.js';
+import { OPEN_STATUSES, WIN_STATUSES, ZONE_LAT, ZONE_LNG } from './rules.js';
+import { teamRating } from './skills.js';
 
 export const store = { data: null, me: null };
 
@@ -58,6 +59,65 @@ export const members = (tid) => store.data.profiles.filter((p) => p.team_id === 
 export const myTeam = () => (store.me?.team_id ? teamById(store.me.team_id) : null);
 export const isCaptainOf = (tid) => !!(store.me && tid && teamById(tid)?.captain_id === store.me.id);
 export const isAdmin = () => !!store.me?.is_admin;
+export const isStaff = () => !!(store.me && (store.me.is_admin || store.me.is_moderator));
+
+// ---- filtr sportu (wspólny dla mapy, tabeli, drużyn, meczów)
+export const ui = { sport: 'all' };
+try { ui.sport = localStorage.getItem('bbkort_sport') || 'all'; } catch { /* ignore */ }
+export function setSport(s) {
+  ui.sport = s;
+  try { localStorage.setItem('bbkort_sport', s); } catch { /* ignore */ }
+}
+export const sportOk = (sport) => ui.sport === 'all' || ui.sport === sport;
+export const challengeSport = (c) => courtById(c.court_id)?.sport || teamById(c.challenger_team_id)?.sport;
+
+// ---- STREFY TERENU: siatka ~1 km, strefa należy do drużyny z największą liczbą boisk
+export function zones() {
+  const cells = new Map();
+  for (const c of store.data.courts) {
+    if (!c.king_team_id || !sportOk(c.sport)) continue;
+    const i = Math.floor(c.lat / ZONE_LAT), j = Math.floor(c.lng / ZONE_LNG);
+    const k = `${c.sport}:${i}:${j}`;
+    let z = cells.get(k);
+    if (!z) cells.set(k, (z = { key: k, sport: c.sport, i, j, counts: {}, total: 0 }));
+    z.counts[c.king_team_id] = (z.counts[c.king_team_id] || 0) + 1;
+    z.total++;
+  }
+  for (const z of cells.values()) {
+    const sorted = Object.entries(z.counts).sort((a, b) => b[1] - a[1]);
+    z.owner = sorted.length === 1 || sorted[0][1] > sorted[1][1] ? sorted[0][0] : null;
+    z.bounds = [[z.i * ZONE_LAT, z.j * ZONE_LNG], [(z.i + 1) * ZONE_LAT, (z.j + 1) * ZONE_LNG]];
+  }
+  return [...cells.values()];
+}
+
+// ---- TABELA: kolejność = boiska, potem strefy, potem wygrane, potem obrony
+export function standings(sport) {
+  const zs = zones().filter((z) => z.sport === sport);
+  const rows = store.data.teams.filter((tm) => tm.sport === sport).map((tm) => {
+    const courts = courtsOf(tm.id);
+    const rec = teamRecord(tm.id);
+    return {
+      team: tm,
+      courts: courts.length,
+      zones: zs.filter((z) => z.owner === tm.id).length,
+      defenses: courts.reduce((s, c) => s + c.defenses, 0),
+      w: rec.w, l: rec.l,
+      rating: teamRating(members(tm.id), sport),
+    };
+  });
+  rows.sort((a, b) => b.courts - a.courts || b.zones - a.zones || b.w - a.w || b.defenses - a.defenses || a.l - b.l || a.team.name.localeCompare(b.team.name));
+  rows.forEach((r, i) => (r.pos = i + 1));
+  return rows;
+}
+
+// ---- KANAŁ AKTYWNOŚCI: kto co zdobył
+export const feed = (limit = 15) => store.data.court_history
+  .filter((h) => h.event !== 'reset' && sportOk(courtById(h.court_id)?.sport))
+  .sort((a, b) => T(b.at) - T(a.at)).slice(0, limit);
+
+// jak zdobyto boisko (ostatnie przejęcie)
+export const lastCapture = (cid) => courtHistory(cid).find((h) => h.event === 'claim' || h.event === 'capture');
 export const courtsOf = (tid) => store.data.courts.filter((c) => c.king_team_id === tid);
 export const openChallengeForCourt = (cid) => store.data.challenges.find((c) => c.court_id === cid && OPEN_STATUSES.includes(c.status));
 export const signups = (chid) => store.data.challenge_players.filter((x) => x.challenge_id === chid);

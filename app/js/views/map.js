@@ -1,43 +1,63 @@
-// Mapa boisk – tryb "King of the Court"
+// Mapa boisk – tryb "King of the Court" z terenem drużyn
 import { CONFIG } from '../config.js';
 import { api } from '../api/index.js';
 import { t } from '../i18n.js';
-import { RULES, distM } from '../rules.js';
+import { RULES, SPORTS, SPORT_ICON, distM } from '../rules.js';
 import { geo, currentPos } from '../geo.js';
 import { fetchArea, googleSatelliteUrl } from '../courts-import.js';
-import { esc, bind, modal, toast, fmtDate, fmtLeft, fmtDist, teamTag, localInputValue, confirmBox } from '../ui.js';
+import { esc, bind, modal, toast, fmtDate, fmtDay, fmtLeft, fmtDist, teamTag, localInputValue, confirmBox } from '../ui.js';
 import {
-  store, act, reload, now, T, teamById, myTeam, isCaptainOf, isAdmin, openChallengeForCourt,
-  courtName, courtHistory, courtById, errText,
+  store, act, reload, now, T, teamById, myTeam, isCaptainOf, isAdmin, openChallengeForCourt, courtName, courtHistory,
+  courtById, errText, ui, setSport, sportOk, zones, standings, lastCapture, rerender,
 } from '../state.js';
 
-let map, markers, meMarker, meCircle, layers = {}, curLayer = null;
-let openCourtId = null, followedFirstFix = false, userMoved = false;
+let map, markers, zoneLayer, meMarker, meCircle, layers = {}, curLayer = null;
+let openCourtId = null, followedFirstFix = false, userMoved = false, showZones = true;
 const PREF = 'bbkort_layer';
+const POLAND = [[48.9, 14.0], [55.0, 24.3]];
+
+function buildLayers() {
+  const esri = (path, o = {}) => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/${path}/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 20, maxNativeZoom: 19, ...o });
+  const labels = () => [esri('Reference/World_Transportation', { opacity: 0.6 }), esri('Reference/World_Boundaries_and_Places')];
+
+  // DARMOWO: ortofotomapa Geoportalu (Polska) na podkładzie Esri (reszta świata)
+  layers.sat = L.layerGroup([
+    esri('World_Imagery', { attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
+    L.tileLayer.wms('https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/StandardResolution', {
+      layers: 'Raster', format: 'image/jpeg', version: '1.3.0', maxZoom: 20, maxNativeZoom: 19,
+      bounds: L.latLngBounds(POLAND), attribution: 'Ortofotomapa © GUGiK / geoportal.gov.pl',
+    }),
+    ...labels(),
+  ]);
+  layers.esri = L.layerGroup([esri('World_Imagery', { attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }), ...labels()]);
+  layers.map = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
+  if (CONFIG.MAPBOX_TOKEN) {
+    layers.mapbox = L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${encodeURIComponent(CONFIG.MAPBOX_TOKEN)}`,
+      { tileSize: 512, zoomOffset: -1, maxZoom: 21, attribution: '© Mapbox © OpenStreetMap' });
+  }
+  if (CONFIG.MAPTILER_KEY) {
+    layers.maptiler = L.tileLayer(`https://api.maptiler.com/maps/hybrid/256/{z}/{x}/{y}.jpg?key=${encodeURIComponent(CONFIG.MAPTILER_KEY)}`,
+      { maxZoom: 21, attribution: '© MapTiler © OpenStreetMap' });
+  }
+}
 
 export function initMap() {
   map = L.map('map', { zoomControl: false }).setView(CONFIG.DEFAULT_CENTER, CONFIG.DEFAULT_ZOOM);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-  const esri = (path) => `https://server.arcgisonline.com/ArcGIS/rest/services/${path}/MapServer/tile/{z}/{y}/{x}`;
-  layers.sat = L.layerGroup([
-    L.tileLayer(esri('World_Imagery'), { maxZoom: 20, maxNativeZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
-    L.tileLayer(esri('Reference/World_Transportation'), { maxZoom: 20, maxNativeZoom: 19, opacity: 0.7 }),
-    L.tileLayer(esri('Reference/World_Boundaries_and_Places'), { maxZoom: 20, maxNativeZoom: 19 }),
-  ]);
-  layers.map = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
+  buildLayers();
 
   let pref = 'sat';
   try { pref = localStorage.getItem(PREF) || 'sat'; } catch { /* ignore */ }
-  setLayer(pref === 'gsat' ? 'sat' : pref);
+  setLayer(layers[pref] ? pref : 'sat');
   if (CONFIG.GOOGLE_MAPS_API_KEY) {
     googleSatelliteUrl().then((url) => {
       if (!url) return;
       layers.gsat = L.tileLayer(url, { maxZoom: 21, attribution: 'Imagery & map data © Google' });
-      if (pref === 'gsat' || pref === 'sat') setLayer('gsat');
+      if (pref === 'gsat') setLayer('gsat');
     }).catch(() => {});
   }
 
+  zoneLayer = L.layerGroup().addTo(map);
   markers = L.layerGroup().addTo(map);
   map.on('dragstart zoomstart', () => (userMoved = true));
   map.on('moveend', scheduleImport);
@@ -48,16 +68,18 @@ export function initMap() {
   const ctr = document.getElementById('map-controls');
   ctr.innerHTML = `
     <button class="fab" data-act="layer" title="${t('map_layer')}">🛰️</button>
+    <button class="fab" data-act="zones" title="${t('map_zones')}">🚩</button>
     <button class="fab" data-act="locate" title="${t('map_locate')}">📍</button>
     <button class="fab" data-act="search" title="${t('map_search')}">🔍</button>
     <div class="map-status" id="map-status"></div>`;
   bind(ctr, {
     layer: () => {
-      const order = ['sat', ...(layers.gsat ? ['gsat'] : []), 'map'];
+      const order = ['sat', 'esri', 'gsat', 'mapbox', 'maptiler', 'map'].filter((k) => layers[k]);
       const nxt = order[(order.indexOf(curLayer) + 1) % order.length];
       setLayer(nxt);
       toast(t('layer_' + nxt));
     },
+    zones: () => { showZones = !showZones; drawZones(); toast(showZones ? t('zones_on') : t('zones_off')); },
     locate: async () => {
       const p = await currentPos();
       if (p) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15));
@@ -66,6 +88,9 @@ export function initMap() {
     search: () => importVisible(true),
   });
 
+  bind(document.getElementById('map-top'), {
+    sport: (d) => { setSport(d.s); rerender(); },
+  });
   bind(document.getElementById('court-sheet'), sheetHandlers);
   setTimeout(() => scheduleImport(), 1500);
 }
@@ -99,14 +124,49 @@ export function showMap() {
   if (map) setTimeout(() => map.invalidateSize(), 50);
 }
 
+function renderTop() {
+  const el = document.getElementById('map-top');
+  const leaders = SPORTS.filter((s) => sportOk(s)).map((s) => {
+    const top = standings(s)[0];
+    return top && top.courts ? `<a class="leader" href="#/table" style="--c:${esc(top.team.color)}">${SPORT_ICON[s]} ${t('leader')}: ${teamTag(top.team)} · <b>${top.courts}</b> 👑 · <b>${top.zones}</b> 🚩</a>` : '';
+  }).join('');
+  el.innerHTML = `<div class="seg sport-seg">${['all', ...SPORTS].map((s) => `<button data-act="sport" data-s="${s}" class="${ui.sport === s ? 'on' : ''}">${s === 'all' ? t('all') : SPORT_ICON[s]}</button>`).join('')}</div>
+    <div class="leaders">${leaders}</div>`;
+}
+
+function drawZones() {
+  zoneLayer.clearLayers();
+  if (!showZones) return;
+  for (const z of zones()) {
+    const tm = z.owner ? teamById(z.owner) : null;
+    const color = tm ? tm.color : '#9aa3b2';
+    const r = L.rectangle(z.bounds, {
+      color, weight: tm ? 2 : 1, opacity: 0.8, fillColor: color, fillOpacity: tm ? 0.18 : 0.06,
+      dashArray: tm ? null : '6 6', interactive: true,
+    });
+    const lines = Object.entries(z.counts).sort((a, b) => b[1] - a[1])
+      .map(([tid, n]) => `${teamTag(teamById(tid))} ${n}`).join(' · ');
+    r.bindTooltip(`${SPORT_ICON[z.sport]} ${tm ? `${t('zone_owner')}: <b>${esc(tm.name)}</b>` : t('zone_contested')}<br>${lines}`, { sticky: true });
+    zoneLayer.addLayer(r);
+    // etykieta właściciela w rogu strefy
+    zoneLayer.addLayer(L.marker([z.bounds[1][0], z.bounds[0][1]], {
+      interactive: false, keyboard: false,
+      icon: L.divIcon({ className: '', iconAnchor: [-4, -4], html: `<span class="zone-tag" style="--c:${esc(color)}">${SPORT_ICON[z.sport]} ${tm ? esc(tm.tag) : '⚔️'}</span>` }),
+    }));
+  }
+}
+
 export function refreshMap() {
   if (!map || !store.data) return;
+  renderTop();
+  drawZones();
   markers.clearLayers();
   for (const c of store.data.courts) {
+    if (!sportOk(c.sport)) continue;
     const k = c.king_team_id ? teamById(c.king_team_id) : null;
     const busy = !!openChallengeForCourt(c.id);
-    const html = `<div class="pin ${k ? 'owned' : 'free'} ${busy ? 'busy' : ''}" style="--c:${k ? esc(k.color) : '#9aa3b2'}">
-        <span class="pin-ball">🏀</span>${k ? `<span class="pin-crown">👑</span><span class="pin-tag">${esc(k.tag)}</span>` : ''}${busy ? '<span class="pin-fight">⚔️</span>' : ''}
+    const html = `<div class="pin ${k ? 'owned' : 'free'}" style="--c:${k ? esc(k.color) : '#9aa3b2'}">
+        <span class="pin-ball">${SPORT_ICON[c.sport] || '🏀'}</span>${k ? `<span class="pin-crown">👑</span><span class="pin-tag">${esc(k.tag)}</span>` : ''}${busy ? '<span class="pin-fight">⚔️</span>' : ''}
       </div>`;
     const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: '', html, iconSize: [44, 52], iconAnchor: [22, 48] }) });
     m.on('click', () => openCourt(c.id));
@@ -121,6 +181,7 @@ export function focusCourt(id) {
   const c = courtById(id);
   if (!c || !map) return;
   userMoved = true;
+  if (!sportOk(c.sport)) { setSport('all'); refreshMap(); }
   map.setView([c.lat, c.lng], 17);
   openCourt(id);
 }
@@ -137,14 +198,31 @@ function closeSheet() {
   el.innerHTML = '';
 }
 
-function distTo(c) {
-  return geo.pos ? distM(geo.pos.lat, geo.pos.lng, c.lat, c.lng) : null;
+const distTo = (c) => (geo.pos ? distM(geo.pos.lat, geo.pos.lng, c.lat, c.lng) : null);
+
+function histLabel(h) {
+  const tm = h.team_id ? teamById(h.team_id) : null;
+  const ch = h.challenge_id ? store.data.challenges.find((x) => x.id === h.challenge_id) : null;
+  const score = ch && ch.score_challenger != null ? ` <b>${ch.score_challenger}:${ch.score_defender}</b>` : ch && ch.status === 'walkover' ? ` (${t('st_walkover').toLowerCase()})` : '';
+  return `<li><span class="muted">${fmtDate(h.at)}</span> ${tm ? teamTag(tm) : ''} ${t('hist_' + h.event)}${score}</li>`;
 }
 
-const histLabel = (h) => {
-  const tm = h.team_id ? teamById(h.team_id) : null;
-  return `<li><span class="muted">${fmtDate(h.at)}</span> ${tm ? teamTag(tm) : ''} ${t('hist_' + h.event)}</li>`;
-};
+// "Kto zdobył to boisko" – ostatnie przejęcie
+function captureInfo(c) {
+  const h = lastCapture(c.id);
+  if (!h) return '';
+  const ch = h.challenge_id ? store.data.challenges.find((x) => x.id === h.challenge_id) : null;
+  let how = t('how_claim');
+  if (ch) {
+    const loser = teamById(ch.defender_team_id);
+    how = ch.status === 'walkover'
+      ? `${t('how_walkover')} ${teamTag(loser)}`
+      : `${t('how_match')} ${teamTag(loser)} <b>${ch.score_challenger}:${ch.score_defender}</b>`;
+    const ref = ch.resolved_by ? store.data.profiles.find((p) => p.id === ch.resolved_by) : null;
+    if (ref) how += ` · ${t('referee')}: ${esc(ref.nick)}`;
+  }
+  return `<div class="small capture">🏆 ${t('captured')} ${fmtDay(h.at)} – ${how}</div>`;
+}
 
 function renderSheet() {
   const el = document.getElementById('court-sheet');
@@ -157,7 +235,7 @@ function renderSheet() {
   const fake = api.mode === 'demo' && api.demo.fakeGps();
   const protLeft = c.protected_until ? T(c.protected_until) - now() : 0;
   const open = openChallengeForCourt(c.id);
-  const hist = courtHistory(c.id).slice(0, 5);
+  const hist = courtHistory(c.id).slice(0, 6);
 
   let kingHtml;
   if (king) {
@@ -166,6 +244,7 @@ function renderSheet() {
       <div><div class="muted small">${t('king_of_court')}</div>
         <a href="#/team/${esc(king.id)}" class="king-name">${esc(king.name)} ${teamTag(king)}</a>
         <div class="small muted">${t('since')} ${fmtDate(c.king_since)} · ${t('defenses')}: <b>${c.defenses}</b></div></div></div>
+      ${captureInfo(c)}
       ${protLeft > 0 ? `<div class="pill shield">🛡️ ${t('protected_for')} ${fmtLeft(protLeft)}</div>` : ''}`;
   } else {
     kingHtml = `<div class="king free"><div class="king-crown">🏳️</div><div><b>${t('court_free')}</b><div class="small muted">${t('court_free_hint')}</div></div></div>`;
@@ -176,19 +255,21 @@ function renderSheet() {
     actions = `<a class="btn primary block" href="#/login">${t('login_to_play')}</a>`;
   } else if (!mine) {
     actions = `<a class="btn block" href="#/teams">${t('need_team')}</a>`;
+  } else if (mine.sport !== c.sport) {
+    actions = `<div class="small muted center">${t('other_sport_court', { s: t('sport_' + c.sport) })}</div>`;
   } else if (!king) {
     actions = `<button class="btn primary block" data-act="claim" ${near || fake ? '' : 'disabled'}>👑 ${t('claim_court')}</button>
       ${near || fake ? '' : `<div class="small muted center">${t('be_closer', { m: RULES.CHECKIN_RADIUS_M })}</div>`}`;
   } else if (king.id === mine.id) {
     actions = `<div class="pill ok block">🏰 ${t('your_court')}</div>`;
   } else if (open) {
-    actions = `<a class="btn block" href="#/matches">⚔️ ${t('challenge_in_progress')}</a>`;
+    actions = '';
   } else if (!isCaptainOf(mine.id)) {
     actions = `<div class="small muted center">${t('only_captain_challenges')}</div>`;
   } else {
     actions = `<button class="btn primary block" data-act="challenge" ${protLeft > 0 ? 'disabled' : ''}>⚔️ ${t('challenge_king')}</button>`;
   }
-  if (open && !(king && mine && king.id !== mine.id)) {
+  if (open) {
     const ct = teamById(open.challenger_team_id);
     actions += `<a class="btn ghost block" href="#/matches">⚔️ ${t('challenged_by')} ${teamTag(ct)} · ${fmtDate(open.scheduled_at)}</a>`;
   }
@@ -196,8 +277,8 @@ function renderSheet() {
   el.innerHTML = `
     <div class="sheet-handle" data-act="close"></div>
     <button class="sheet-x" data-act="close">×</button>
-    <h2>${esc(courtName(c))}</h2>
-    <div class="small muted">${esc(c.address || '')}${d != null ? ` · ${fmtDist(d)} ${t('from_you')}` : ''} · <span class="src">${esc(c.source)}</span></div>
+    <h2>${SPORT_ICON[c.sport]} ${esc(courtName(c))}</h2>
+    <div class="small muted">${t('sport_' + c.sport)} · ${esc(c.address || '')}${d != null ? ` · ${fmtDist(d)} ${t('from_you')}` : ''} · <span class="src">${esc(c.source)}</span></div>
     ${kingHtml}
     <div class="sheet-actions">${actions}</div>
     <div class="row">
@@ -219,7 +300,7 @@ const sheetHandlers = {
     const c = courtById(openCourtId);
     const def = now() + 24 * 3600e3;
     modal(`<h3>⚔️ ${t('challenge_king')}</h3>
-      <p class="muted">${esc(courtName(c))}</p>
+      <p class="muted">${esc(courtName(c))} · ${teamTag(teamById(c.king_team_id))}</p>
       <label>${t('match_time')}<input type="datetime-local" id="ch-time" value="${localInputValue(def)}"></label>
       <p class="small muted">${t('challenge_rules', { h: RULES.ACCEPT_HOURS })}</p>
       <div class="row end"><button class="btn ghost" data-close>${t('cancel')}</button>

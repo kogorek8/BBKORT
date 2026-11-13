@@ -169,7 +169,7 @@ label input, label select { margin-top: 4px; }
 
 .team-hero { display: flex; gap: 14px; align-items: center; padding: 16px; border-radius: var(--radius); background: linear-gradient(120deg, color-mix(in srgb, var(--c) 35%, var(--card)), var(--card)); }
 .team-logo { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; background: var(--c); color: #0d0f14; font-weight: 900; font-size: 1.1rem; flex-shrink: 0; }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0; }
 .stat { background: var(--card); border-radius: 12px; padding: 10px 6px; text-align: center; }
 .stat b { display: block; font-size: 1.3rem; }
 .stat span { font-size: .7rem; color: var(--muted); }
@@ -304,4 +304,44 @@ label input, label select { margin-top: 4px; }
 #toast.err { border-color: var(--err); color: #ffc2c8; }
 
 /* osadzenie w WordPressie (iframe) */
-@media (max-width: 380px) { .stats { grid-template-columns: repeat(2, 1fr); } .sbar { grid-template-columns: 1fr 60px 26px 30px; } }
+@media (max-width: 380px) { .stats { grid-template-columns: repeat(3, 1fr); } .sbar { grid-template-columns: 1fr 60px 26px 30px; } }
+
+/* ---------- v2: sporty, teren, tabela, sędziowie ---------- */
+.map-top { position: absolute; top: 12px; left: 12px; right: 70px; z-index: 800; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; pointer-events: none; }
+.map-top > * { pointer-events: auto; }
+.sport-seg { background: rgba(21, 25, 34, .92); box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.leaders { display: flex; flex-direction: column; gap: 4px; }
+.leader { display: inline-flex; align-items: center; gap: 5px; background: rgba(21, 25, 34, .92); border: 1px solid var(--c); padding: 4px 9px; border-radius: 999px; font-size: .74rem; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.leaflet-tooltip { background: var(--bg2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
+.capture { margin: 6px 2px 2px; color: #c8cfdb; }
+.capture b { color: var(--text); }
+.ltable-wrap { overflow-x: auto; background: var(--card); border-radius: var(--radius); }
+.ltable { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.ltable th, .ltable td { padding: 9px 6px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.ltable th { color: var(--muted); font-weight: 700; font-size: .75rem; }
+.ltable .l { text-align: left; }
+.ltable td.l { box-shadow: inset 3px 0 0 var(--c); padding-left: 8px; }
+.ltable tr.lead { background: color-mix(in srgb, var(--c) 14%, transparent); }
+.ltable .pos { width: 32px; font-weight: 800; }
+.ltable .tname { font-weight: 700; }
+@media (max-width: 420px) { .ltable .tname { display: none; } }
+.feed { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.feed li { display: flex; gap: 10px; background: var(--card); padding: 10px; border-radius: 12px; font-size: .88rem; }
+.feed a { text-decoration: underline; }
+.fic { font-size: 1.2rem; }
+.pstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.pstats div { background: rgba(0, 0, 0, .25); border-radius: 10px; text-align: center; padding: 8px 4px; }
+.pstats b { display: block; font-size: 1.3rem; }
+.pstats span { font-size: .7rem; color: var(--muted); }
+.pcard.sport-football { background: radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--c) 45%, transparent), transparent 60%), linear-gradient(160deg, #1b2a22, #10161a); }
+.reports { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg2); display: grid; gap: 4px; }
+.reports a { text-decoration: underline; }
+.warn { color: var(--accent2); }
+.okline { color: var(--ok); }
+.ref { margin-top: 4px; color: #c8cfdb; }
+.btn.staff { border-color: #2f5f8a; }
+.btn.staff.primary { background: linear-gradient(180deg, #4da3ff, #2b7fd9); border-color: #4da3ff; color: #031426; }
+.tabs { flex-wrap: wrap; }
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bottom-nav a { font-size: .64rem; }
+.zone-tag { display: inline-block; white-space: nowrap; background: var(--c); color: #0d0f14; font-size: 10px; font-weight: 900; padding: 1px 5px; border-radius: 4px; opacity: .9; }

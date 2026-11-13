@@ -1,6 +1,6 @@
-# BBKORT – King of the Court 🏀👑
+# BBKORT – King of the Court 🏀⚽👑
 
-Aplikacja webowa (PWA) dla koszykarzy streetballu: **mapa boisk na zdjęciach satelitarnych**, **drużyny** i walka o tytuł **King of the Court**. Drużyny przejmują boiska i bronią ich przed wyzwaniami, podobnie jak w grach terenowych. Zawodnicy mają **karty umiejętności jak w grach koszykarskich**, które zatwierdza admin.
+Aplikacja webowa (PWA) dla koszykarzy i piłkarzy, inspirowana grami terenowymi. Na **mapie satelitarnej** widać boiska i kto nimi rządzi. Drużyny **przejmują boiska i teren**, a inne drużyny mogą je **publicznie wyzwać**. Wynik każdego meczu zatwierdza **sędzia BBKORT**. Zawodnicy mają **karty umiejętności w stylu gier sportowych**.
 
 Język: **polski** z przełącznikiem na **angielski** (przycisk EN/PL w prawym górnym rogu).
 
@@ -10,30 +10,30 @@ Język: **polski** z przełącznikiem na **angielski** (przycisk EN/PL w prawym 
 
 | Funkcja | Opis |
 |---|---|
-| 🗺️ Mapa | Satelita (Esri, darmowa) albo satelita Google (z kluczem API), mapa uliczna, Twoja pozycja GPS na żywo |
-| 🔍 Boiska automatycznie | Przy przesuwaniu mapy aplikacja sama szuka boisk do kosza w OpenStreetMap (i w Google, jeśli podasz klucz). Duplikaty w promieniu 40 m są pomijane |
-| 👑 Przejmowanie | Wolne boisko przejmujesz, będąc na miejscu (do 150 m). Na mapie widać kolor i skrót drużyny-króla |
-| ⚔️ Wyzwania | Kapitan wyzywa króla → zapisy → check-in GPS na boisku → wynik → potwierdzenie przez drugiego kapitana w 24 h |
-| 🏳️ Walkowery | Król nie odpowiedział w 24 h, rywal się nie stawił albo kapitan nie potwierdził wyniku w 24 h – walkower dla strony, która się zgłosiła |
-| 👻 Duchy | Kto zapisał się na mecz i nie zameldował się na boisku, jest pomijany i dostaje znaczek ducha na profilu (licznik) |
-| 🛡️ Drużyny | Ranking (boiska, bilans), profil drużyny, skład, boiska, historia meczów, rating (**tymczasowy** = średni OVR) |
-| 🃏 Karta zawodnika | 17 umiejętności w 5 grupach, OVR, pozycja, numer i wzrost. Zmiany zgłoszone przez zawodnika są oznaczone jako **„czeka na akceptację admina”**, a ▲▼ pokazują różnicę |
-| 🛠️ Panel admina | Akceptacja lub odrzucenie skilli (z linkiem do filmiku i ostatnimi wynikami drużyny), rozstrzyganie sporów o wynik, zwalnianie i usuwanie boisk |
-| 📱 PWA | Można dodać do ekranu głównego telefonu jak aplikację |
+| 🗺️ Mapa satelitarna | Darmowa ortofotomapa **Geoportalu** (cała Polska, bardzo dokładna), poza Polską Esri. Opcjonalnie Google, Mapbox lub MapTiler. Twoja pozycja GPS na żywo |
+| 🏀⚽ Dwa sporty | Koszykówka i piłka nożna: boiska, drużyny, karty i tabele są osobne dla każdego sportu. Filtr sportu na każdej zakładce |
+| 🔍 Boiska automatycznie | Przy przesuwaniu mapy aplikacja sama szuka boisk w OpenStreetMap (i w Google, jeśli podasz klucz). Boiska wielofunkcyjne są dodawane osobno dla każdego sportu |
+| 👑 Właściciel boiska | Pinezka w kolorze drużyny-króla. Karta boiska pokazuje, **kto i jak zdobył boisko** (wynik, walkower, sędzia), od kiedy i ile razy go obronił |
+| 🚩 Teren drużyn | Mapa jest podzielona na strefy ~1 km. Strefa należy do drużyny, która ma w niej najwięcej boisk. Widać kolor, skrót drużyny i strefy sporne |
+| 📊 Tabela | Osobna dla każdego sportu: boiska → strefy → wygrane → obrony, plus rating. Na mapie widać lidera, a pod tabelą kanał „Ostatnie zdobycze” |
+| ⚔️ Publiczna tablica wyzwań | Wszyscy widzą, kto kogo wyzwał. Król ma **48 h** na przyjęcie, brak odpowiedzi oznacza walkower |
+| 🧑‍⚖️ Sędziowie | Każdy mecz ma sędziego BBKORT (na miejscu albo z nagrania). **Tylko sędzia lub admin zatwierdza wynik.** Kapitanowie obu drużyn mogą zgłosić wynik z linkiem do nagrania, a aplikacja pokazuje, czy ich zgłoszenia są zgodne |
+| 👻 Duchy | Kto zapisał się na mecz, a nie zameldował się GPS-em na boisku, jest pomijany i dostaje znaczek ducha |
+| 🃏 Karty zawodników | Koszykówka: 17 umiejętności w 5 grupach. Piłka: 24 umiejętności w 7 grupach (osobny OVR dla bramkarza). Zawodnik wpisuje skille sam, a do akceptacji karta jest oznaczona **„czeka na akceptację”** |
+| 🛠️ Panel | Admin i moderatorzy: wyniki do zatwierdzenia, mecze bez sędziego, akceptacja skilli. Tylko admin nadaje uprawnienia moderatora |
 
 ### Zasady (edytowalne w `app/js/rules.js` **i** `supabase/schema.sql`)
-1. Wolne boisko przejmujesz, będąc na miejscu (max 150 m).
-2. Kapitan wyzywa króla. Termin meczu musi wypadać od 1 h do 7 dni od teraz. Król ma 24 h (albo czas do startu meczu) na przyjęcie. Brak odpowiedzi oznacza walkower i ducha dla kapitana.
-3. Check-in na boisku jest otwarty od 30 min przed startem do 30 min po starcie.
-4. Jeśli 30 min po starcie jest tylko jedna drużyna, jej kapitan może żądać walkowera.
-5. Wynik wpisuje jeden kapitan, a drugi ma 24 h na potwierdzenie. Brak potwierdzenia oznacza walkower dla strony, która potwierdziła, i ducha dla milczącego kapitana. Gdy drugi kapitan się nie zgadza, decyduje admin.
+1. Wolne boisko przejmujesz, będąc na miejscu (max 150 m). Drużyna gra tylko na boiskach swojego sportu.
+2. Kapitan publicznie wyzywa króla boiska. Termin meczu musi wypadać od 1 h do 7 dni od teraz. Król ma **48 h** (albo czas do startu) na przyjęcie. Brak odpowiedzi oznacza walkower i ducha dla kapitana.
+3. Każdy mecz musi mieć **sędziego BBKORT**, który jest na miejscu albo ogląda nagranie. Wynik obowiązuje dopiero po zatwierdzeniu przez sędziego lub admina.
+4. Kapitanowie obu drużyn mogą zgłosić wynik albo walkower (rywal się nie stawił), najlepiej z nagraniem.
+5. Check-in GPS na boisku trwa od 30 min przed do 30 min po starcie.
 6. Po przejęciu lub obronie boisko jest chronione przez 24 h.
+7. Mecz bez żadnego zgłoszonego wyniku wygasa 48 h po starcie.
 
 ---
 
 ## 1. Podgląd (tryb demo) – 1 minuta
-
-Bez żadnej konfiguracji aplikacja działa w **trybie demo**: przykładowe drużyny z Warszawy, dane zapisane tylko w Twojej przeglądarce.
 
 ```bash
 cd app
@@ -42,70 +42,59 @@ python3 -m http.server 8000
 ```
 
 W demo możesz:
-- **zmieniać gracza** (pasek u góry → „zmień gracza”), np. zalogować się jako kapitan Bartek, a potem jako Michał, i rozegrać mecz,
-- w **Admin → Narzędzia demo** przesuwać czas o +30 min, +1 h lub +24 h, żeby sprawdzić walkowery i duchy,
+- **zmieniać gracza** (pasek u góry → „zmień gracza”): kapitanowie, piłkarze, **Sędzia Marek** (moderator) i **Admin**,
+- w **Panel → Demo** przesuwać czas o +30 min, +1 h lub +48 h, żeby sprawdzić walkowery i duchy,
 - włączyć „udawany GPS”, żeby przejmować boiska bez wychodzenia z domu.
 
 ---
 
 ## 2. Wersja na żywo – baza Supabase (darmowa)
 
-1. Załóż konto na <https://supabase.com> i utwórz nowy projekt (region: Frankfurt).
+1. Załóż konto na <https://supabase.com> i utwórz projekt (region: Frankfurt).
 2. Otwórz **SQL Editor**, wklej całą zawartość pliku `supabase/schema.sql` i kliknij **Run**.
-3. W **Authentication → URL Configuration** ustaw **Site URL** na adres, pod którym będzie aplikacja (np. `https://twojastrona.pl/...`).
-4. W **Project Settings → API** skopiuj `Project URL` i klucz `anon public` do pliku `app/js/config.js`:
-   ```js
-   SUPABASE_URL: 'https://xxxx.supabase.co',
-   SUPABASE_ANON_KEY: 'eyJ...',
-   ```
-   Klucz `anon` jest publiczny i może być w przeglądarce. **Nigdy** nie wklejaj tam klucza `service_role`.
+3. W **Authentication → URL Configuration** ustaw **Site URL** na adres aplikacji.
+4. W **Project Settings → API** skopiuj `Project URL` i klucz `anon public` do pliku `app/js/config.js`. **Nigdy** nie wklejaj tam klucza `service_role`.
 5. Zarejestruj się w aplikacji, a potem w SQL Editor nadaj sobie uprawnienia admina:
    ```sql
    update public.profiles set is_admin = true where nick = 'TWÓJ_NICK';
    ```
-6. (Opcjonalnie) Automatyczne rozliczanie terminów co 10 min, nawet gdy nikt nie ma otwartej aplikacji: **Database → Extensions → pg_cron**, a potem uruchom polecenie z końca pliku `schema.sql`. Bez tego terminy i tak są rozliczane przy każdym otwarciu aplikacji.
+6. Moderatorów (sędziów) nadajesz w aplikacji: **Panel → Moderatorzy**.
+7. (Opcjonalnie) automatyczne rozliczanie terminów: **Database → Extensions → pg_cron**, a potem uruchom polecenie z końca pliku `schema.sql`.
 
-Wszystkie zasady gry są pilnowane **po stronie serwera**: przejęcia, walkowery i akceptację skilli wykonują funkcje w bazie. Nikt nie przejmie boiska, edytując dane w przeglądarce.
+Wszystkie zasady gry są pilnowane **po stronie serwera**. Gracz nie może sam zmienić wyniku, przejąć boiska ani nadać sobie uprawnień.
 
 ---
 
 ## 3. Wgranie na WordPressa
 
-**Wymagane HTTPS** (kłódka przy adresie), bez tego telefon nie poda lokalizacji GPS.
+**Wymagane HTTPS**, bez tego telefon nie poda lokalizacji GPS.
 
 1. Uzupełnij `app/js/config.js` (krok 2).
-2. Zbuduj wtyczkę:
-   ```bash
-   ./scripts/build-wordpress.sh      # → dist/bbkort-wordpress.zip
-   ```
-3. W WordPressie: **Wtyczki → Dodaj nową → Wyślij wtyczkę na serwer** → wybierz `bbkort-wordpress.zip` → **Włącz**.
-4. Utwórz stronę (np. „Graj”) i wstaw blok **Shortcode** z treścią:
-   ```
-   [bbkort]
-   ```
-   Opcje: `[bbkort height="700px"]`, `[bbkort view="teams"]`.
-
-Pod aplikacją jest też link **„Otwórz na pełnym ekranie”**. Na telefonie najlepiej otworzyć ją w ten sposób i dodać do ekranu głównego.
-
-> Alternatywa: wgraj zawartość folderu `app/` przez FTP na subdomenę, np. `graj.twojastrona.pl`.
+2. Zbuduj wtyczkę: `./scripts/build-wordpress.sh` → `dist/bbkort-wordpress.zip`.
+3. W WordPressie: **Wtyczki → Dodaj nową → Wyślij wtyczkę na serwer** → wybierz plik zip → **Włącz**.
+4. Na wybranej stronie wstaw blok **Shortcode**: `[bbkort]`. Opcje: `[bbkort height="700px"]`, `[bbkort view="table"]`.
 
 ---
 
-## 4. Google Maps – satelita Google i boiska z Google (opcjonalnie)
+## 4. Mapa satelitarna – opcje
 
-Tak, da się to zrobić oficjalnie, przez **Google Maps Platform**. Nie trzeba niczego negocjować z Google, wystarczy klucz API:
+| Opcja | Koszt | Jakość | Co zrobić |
+|---|---|---|---|
+| **Geoportal (GUGiK) – ortofotomapa** ✅ domyślna | **Darmowa** (dane publiczne) | Bardzo wysoka w całej Polsce (zdjęcia lotnicze) | Nic, już działa |
+| **Esri World Imagery** ✅ włączona | Darmowa z podpisem źródła. Przy dużym ruchu komercyjnym warto założyć darmowe konto ArcGIS Location Platform (ma darmowy limit) | Dobra, cały świat | Nic, już działa (poza Polską i jako warstwa zapasowa) |
+| **MapTiler Satellite** | Darmowy plan z limitem, potem płatny | Dobra | Załóż konto na maptiler.com i wpisz klucz w `config.js` → `MAPTILER_KEY` |
+| **Mapbox Satellite** | Darmowy limit wyświetleń miesięcznie, potem płatny | Dobra, ładne etykiety | Załóż konto na mapbox.com i wpisz token w `config.js` → `MAPBOX_TOKEN` |
+| **Google (Map Tiles API)** | Darmowy limit miesięczny, ale **wymaga karty**; powyżej limitu płatne | Bardzo dobra | Zobacz niżej |
 
-1. Wejdź na <https://console.cloud.google.com>, utwórz projekt i **podepnij konto rozliczeniowe** (karta jest wymagana, ale Google daje miesięczny darmowy limit; aktualne limity znajdziesz w cenniku Google Maps Platform).
-2. Włącz API: **Maps JavaScript API**, **Places API (New)** i **Map Tiles API**.
-3. Utwórz klucz API i **ogranicz go do swojej domeny** (HTTP referrers: `https://twojastrona.pl/*`).
-4. Wpisz go w `app/js/config.js` → `GOOGLE_MAPS_API_KEY`.
-5. Ustaw w Google Cloud **budżet i alerty**, żeby nie było niespodzianek na rachunku.
+Przycisk 🛰️ na mapie przełącza wszystkie dostępne warstwy.
 
-Po dodaniu klucza na mapie pojawia się warstwa **„Satelita Google”** (przycisk 🛰️), a boiska są wyszukiwane również w Google.
+### Google (opcjonalnie)
+1. Wejdź na <https://console.cloud.google.com>, utwórz projekt i podepnij konto rozliczeniowe.
+2. Włącz **Maps JavaScript API**, **Places API (New)** i **Map Tiles API**.
+3. Utwórz klucz API, **ogranicz go do swojej domeny** i ustaw budżet z alertami.
+4. Wpisz go w `config.js` → `GOOGLE_MAPS_API_KEY`. Pojawi się warstwa „Satelita Google” i wyszukiwanie boisk w Google.
 
-Bez klucza aplikacja działa w pełni za darmo: zdjęcia satelitarne Esri i boiska z OpenStreetMap.
-
-⚠️ Regulamin Google ogranicza trwałe przechowywanie danych z Google Places, pozwala zapisywać na stałe tylko identyfikator miejsca. Dlatego głównym źródłem boisk jest OpenStreetMap, a Google jest dodatkiem. Przy większej skali warto to sprawdzić z regulaminem.
+⚠️ Regulamin Google ogranicza trwałe przechowywanie danych z Google Places. Dlatego głównym źródłem boisk jest OpenStreetMap, a Google jest dodatkiem.
 
 ---
 
@@ -113,24 +102,22 @@ Bez klucza aplikacja działa w pełni za darmo: zdjęcia satelitarne Esri i bois
 
 ```
 app/                     ← cała aplikacja (statyczne pliki, bez budowania)
-  index.html
-  css/style.css
-  js/config.js           ← KONFIGURACJA (Supabase, Google)
-  js/rules.js            ← stałe zasad gry
-  js/skills.js           ← lista skilli, OVR, rating drużyny (tymczasowy wzór)
+  js/config.js           ← KONFIGURACJA (Supabase, Google, Mapbox, MapTiler)
+  js/rules.js            ← stałe zasad gry, sporty, rozmiar stref
+  js/skills.js           ← skille koszykówki i piłki, OVR, rating (tymczasowy wzór)
   js/i18n.js             ← tłumaczenia PL / EN
+  js/state.js            ← strefy terenu, tabela, kanał aktywności
   js/api/demo.js         ← tryb demo (localStorage)
   js/api/supabase.js     ← tryb produkcyjny
-  js/courts-import.js    ← automatyczne wyszukiwanie boisk (OSM / Google)
-  js/views/*.js          ← ekrany: mapa, drużyny, zawodnik, mecze, admin, logowanie
+  js/courts-import.js    ← automatyczne wyszukiwanie boisk
+  js/views/*.js          ← mapa, tabela, drużyny, zawodnik, wyzwania, panel, logowanie
 supabase/schema.sql      ← baza danych + zasady gry po stronie serwera
 wordpress/bbkort/        ← wtyczka WordPress (shortcode [bbkort])
-scripts/build-wordpress.sh
-docs/                    ← materiały projektu (plan, „pomysł taty”, zdjęcia)
+docs/                    ← materiały projektu
 ```
 
 ## Do ustalenia w kolejnym etapie
-- **Rating drużyny**: docelowy wzór. Wystarczy podmienić funkcję `teamRating()` w `app/js/skills.js`.
-- Powiadomienia push (np. „Twoje boisko zostało wyzwane!”).
-- Własne zdjęcia i logo drużyn.
-- Dodawanie boisk ręcznie przez graczy (z akceptacją admina).
+- **Rating drużyny**: docelowy wzór. Wystarczy podmienić `teamRating()` w `app/js/skills.js`.
+- Powiadomienia push („Twoje boisko zostało wyzwane!”).
+- Regulamin i polityka prywatności (RODO).
+- Kolejne mechaniki: poziomy i XP, odznaki, zadania, sezony, turnieje.
